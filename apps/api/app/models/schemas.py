@@ -80,6 +80,62 @@ class TopicTagOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class RepurposeRequest(BaseModel):
+    platforms: list[str] = Field(min_length=1)
+
+
+class SocialPostOut(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID | None
+    workspace_id: uuid.UUID
+    platform: str
+    caption: str | None
+    hashtags: list[str]
+    cta: str | None
+    media_asset_id: uuid.UUID | None
+    status: str
+    scheduled_at: datetime | None
+    timezone: str
+    posting_slot: str | None
+    published_at: datetime | None
+    external_post_id: str | None
+    external_url: str | None
+    is_historical: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SocialPostUpdate(BaseModel):
+    caption: str | None = None
+    hashtags: list[str] | None = None
+    cta: str | None = None
+    media_asset_id: uuid.UUID | None = None
+    scheduled_at_local: str | None = Field(default=None, description="ISO datetime, no timezone offset")
+    timezone: str | None = None
+    status: str | None = None
+
+
+class PublishRequest(BaseModel):
+    external_url: str
+    published_at: datetime | None = None
+
+
+class PlatformLimitOut(BaseModel):
+    platform: str
+    caption_max_chars: int
+    caption_max_chars_premium: int | None
+    duration_max_seconds: int
+    duration_max_seconds_premium: int | None
+    hashtag_max_count: int | None
+    aspect_ratio: str
+    verified: bool
+    notes: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class BrandProfileUpdate(BaseModel):
     tone: str | None = None
     voice_samples_json: list[str] | None = None
@@ -92,6 +148,7 @@ class BrandProfileUpdate(BaseModel):
     english_variant: str | None = None
     wpm: int | None = Field(default=None, ge=80, le=220)
     timezone: str | None = None
+    platform_flags_json: dict[str, bool] | None = None
 
 
 class SectionOut(BaseModel):
@@ -279,6 +336,7 @@ class BrandProfileOut(BaseModel):
     english_variant: str
     wpm: int
     timezone: str
+    platform_flags_json: dict
     version_no: int
 
     model_config = {"from_attributes": True}

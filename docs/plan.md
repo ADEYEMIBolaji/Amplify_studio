@@ -190,7 +190,42 @@ rather have it sooner.
 
 ---
 
-## Week 4 — Captions, platform checks, calendar, publishing evidence, reminders
+## Week 4 — Captions, platform checks, calendar, publishing evidence, reminders — ✅ done (2026-10-14)
+
+Delivered: `generate_caption` added to `LLMProvider`/`FakeLLMProvider`, producing distinct
+caption/hashtags/CTA per platform from the approved (or latest) script, upserted into
+`social_posts`; a `platform_limits` table seeded per the FRD FR-026 table (self-seeding on first
+use for SQLite dev/test, since SQLite doesn't run SQL migrations) with an `EffectiveLimits`
+service that factors in the Owner's `x_premium` flag (now exposed on Settings) and blocks
+too-long captions/hashtag counts and over-duration/wrong-aspect exports with specific messages
+("X allows 2:20 ... this video is 2:58") rather than a generic rejection; a Calendar backed by
+`social_posts.scheduled_at`, converted from the Owner's wall-clock local time via `zoneinfo` (not
+a fixed offset), which is what makes the BST/GMT transition come out correct automatically —
+verified with both a summer (BST) and a post-clock-change (GMT) fixture; `posting_slot` computed
+from local time, not UTC; publish/unpublish with `external_post_id` parsed per platform's URL
+pattern; a `Reminder` row pair (on-time + 30-minute lead) created whenever a post is scheduled,
+sent by a `send_due_reminders` service exercised directly in tests (not by waiting on wall-clock
+time), and deleted outright when a post is published — "reminders stop" because there's nothing
+left to fire. Repurpose and Calendar pages in the frontend, with live remaining-character counts
+and an inline schedule/publish flow. 21 new backend tests (64 total), 2 new frontend test files;
+`ruff`, `mypy`, `eslint`, `tsc`, `next build` all pass clean.
+
+**Found and fixed along the way (not scope creep — these were correctness bugs in the Week 4
+work, caught by its own test suite before you ever saw them):** (1) this Windows dev machine's
+Python has no bundled IANA timezone database, so `zoneinfo.ZoneInfo("Europe/London")` raised
+outright until the `tzdata` package was added to `requirements.txt` — worth double-checking the
+actual deploy target has it, though Linux containers normally ship their own system tzdata and
+don't need the package at all; (2) SQLite silently drops timezone info on datetime round-trips,
+which was turning UTC-aware timestamps back into naive ones and corrupting the AT-11 arithmetic —
+fixed with a small `UTCDateTime` SQLAlchemy type that normalises on both read and write, applied
+to every column where that mattered (`scheduled_at`, `published_at`, `send_at`, `sent_at`).
+
+**Known limitation (flagging, not hiding):** `platform_limits` seed values are placeholders the
+FRD itself says must be verified before launch (D-07) — unchanged from the FRD's own table, not
+something this week invented or could resolve. Attaching an export to a post currently accepts
+any `ready` media asset regardless of `kind` (source/srt), since burn-in rendering (which would
+produce a `kind='render'` asset) remains unbuilt — flagged, not hidden, and revisited whenever
+burn-in lands.
 
 **Must ship**
 - Repurpose: platform captions/hashtags/CTAs for Instagram, TikTok, Facebook, X, generated from

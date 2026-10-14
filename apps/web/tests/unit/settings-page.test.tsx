@@ -22,6 +22,7 @@ const baseProfile = {
   english_variant: "UK",
   wpm: 150,
   timezone: "Europe/London",
+  platform_flags_json: {},
   version_no: 1,
 };
 

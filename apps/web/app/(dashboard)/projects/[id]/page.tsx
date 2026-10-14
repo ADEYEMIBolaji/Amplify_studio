@@ -116,6 +116,12 @@ export default function ProjectDetailPage() {
         >
           Video Studio
         </Link>
+        <Link
+          href={`/projects/${projectId}/repurpose`}
+          className="inline-block rounded border border-black/20 px-3 py-2 text-sm font-medium dark:border-white/20"
+        >
+          Repurpose
+        </Link>
       </div>
 
       {/* Hooks — FR-022 */}

@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 500 * 1024 * 1024
     max_upload_duration_seconds: int = 300
 
+    frontend_base_url: str = "http://localhost:3000"
+    reminder_lead_minutes: int = 30
+
     @property
     def is_development(self) -> bool:
         return self.env == "development"

@@ -170,6 +170,42 @@ export interface Transcript {
   reviewed_at: string | null;
 }
 
+export type Platform = "instagram" | "tiktok" | "facebook" | "x";
+export type PostStatus = "draft" | "ready" | "published";
+
+export interface SocialPost {
+  id: string;
+  project_id: string | null;
+  workspace_id: string;
+  platform: Platform;
+  caption: string | null;
+  hashtags: string[];
+  cta: string | null;
+  media_asset_id: string | null;
+  status: PostStatus;
+  scheduled_at: string | null;
+  timezone: string;
+  posting_slot: "morning" | "midday" | "evening" | null;
+  published_at: string | null;
+  external_post_id: string | null;
+  external_url: string | null;
+  is_historical: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformLimit {
+  platform: Platform;
+  caption_max_chars: number;
+  caption_max_chars_premium: number | null;
+  duration_max_seconds: number;
+  duration_max_seconds_premium: number | null;
+  hashtag_max_count: number | null;
+  aspect_ratio: string;
+  verified: boolean;
+  notes: string | null;
+}
+
 export interface BrandProfile {
   id: string;
   workspace_id: string;
@@ -184,5 +220,6 @@ export interface BrandProfile {
   english_variant: string;
   wpm: number;
   timezone: string;
+  platform_flags_json: Record<string, boolean>;
   version_no: number;
 }

@@ -45,6 +45,15 @@ class SectionDraft:
     prompt_version: str
 
 
+@dataclass
+class CaptionDraft:
+    caption: str
+    hashtags: list[str]
+    cta: str
+    model_id: str
+    prompt_version: str
+
+
 class LLMProvider(ABC):
     @abstractmethod
     async def generate_script(
@@ -75,3 +84,13 @@ class LLMProvider(ABC):
         brand_profile: BrandProfile,
         other_sections: dict[str, str],
     ) -> SectionDraft: ...
+
+    @abstractmethod
+    async def generate_caption(
+        self,
+        *,
+        platform: str,
+        topic: str,
+        script_sections: dict[str, str],
+        brand_profile: BrandProfile,
+    ) -> CaptionDraft: ...

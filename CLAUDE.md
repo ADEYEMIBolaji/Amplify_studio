@@ -47,10 +47,12 @@ with the **service role**, which bypasses Postgres RLS (FRD section 1, NFR Secur
 │   │   │   ├── login/               # Supabase email/password sign-in
 │   │   │   └── (dashboard)/         # authenticated shell (layout redirects to /login if signed out)
 │   │   │       ├── dashboard/       # home — pipeline-by-state placeholder until FR-025 (Week 5)
-│   │   │       ├── settings/        # FR-020 voice profile and guardrails
+│   │   │       ├── settings/        # FR-020 voice profile and guardrails, FR-026 X Premium flag
+│   │   │       ├── calendar/        # FR-011/012 schedule, publish, unpublish
 │   │   │       └── projects/        # FR-002 list/create; [id] for edit/archive/transition, script, hooks, references
 │   │   │           └── [id]/
 │   │   │               ├── video/          # FR-007/008/009 upload, transcription, subtitle edit, SRT export
+│   │   │               ├── repurpose/      # FR-010 platform captions/hashtags/CTAs, live character counts
 │   │   │               └── teleprompter/   # FR-006 Prompter-only mode
 │   │   ├── components/
 │   │   ├── lib/
@@ -60,18 +62,18 @@ with the **service role**, which bypasses Postgres RLS (FRD section 1, NFR Secur
 │   │   └── tests/                   # Vitest (tests/unit) + Playwright (tests/e2e)
 │   └── api/                        # FastAPI app (Python 3.12)
 │       ├── app/
-│       │   ├── routers/            # projects, topic_tags, brand_profile, scripts, hooks, references, media, transcripts, vocabulary
+│       │   ├── routers/            # projects, topic_tags, brand_profile, scripts, hooks, references, media, transcripts, vocabulary, posts, platform_limits
 │       │   ├── models/schemas.py   # Pydantic request/response models
 │       │   ├── db/                 # SQLAlchemy models (models.py) mirroring the Supabase migration, base.py, portable GUID type
 │       │   ├── providers/          # LLMProvider, TranscriptionProvider, VideoProcessor, StorageProvider + Fake/Local implementations
-│       │   ├── services/           # state_machine.py (FRD 1.1), audit.py, scripts.py, scripture.py, media_jobs.py, srt.py; metrics/insights land Weeks 5-6
-│       │   ├── worker/             # polls media_jobs left pending (main.py) — picks up crash recovery, not the primary path
+│       │   ├── services/           # state_machine.py (FRD 1.1), audit.py, scripts.py, scripture.py, media_jobs.py, srt.py, posts.py (timezone/external-ID parsing), platform_limits.py, reminders.py; metrics/insights land Weeks 5-6
+│       │   ├── worker/             # polls media_jobs left pending + due reminders (main.py)
 │       │   ├── auth.py             # Supabase JWT verification
 │       │   ├── deps.py             # DB session + get_current_workspace (provisions user/workspace on first call)
 │       │   └── errors.py           # AppError hierarchy -> typed {code, message} JSON
 │       └── tests/                  # pytest — conftest.py overrides auth/DB deps with SQLite + a settable fake user
 ├── supabase/
-│   └── migrations/                 # 0001 full schema from FRD section 5, 0002 scripture pasted_text, 0003 media pipeline (RLS throughout)
+│   └── migrations/                 # 0001 full schema from FRD section 5, 0002 scripture pasted_text, 0003 media pipeline, 0004 platform_limits (RLS throughout)
 ├── docker-compose.yml              # web/api/worker — untested locally (no Docker in this environment)
 ├── .env.example
 └── CLAUDE.md
@@ -161,8 +163,8 @@ sync when a field changes.
   Week 5 stretch, after manual metric entry works.
 
 ## Status
-Weeks 1–3 built — see [docs/plan.md](docs/plan.md) for what shipped, what's stubbed, and what's
-next. Weeks 4–6 not yet started.
+Weeks 1–4 built — see [docs/plan.md](docs/plan.md) for what shipped, what's stubbed, and what's
+next. Weeks 5–6 not yet started.
 
 Open: no `docs/design/` handoff yet (UI follows Tailwind defaults + FRD section 6); migration
 tooling is Supabase CLI SQL files (`supabase/migrations/`), consumed by the backend via
@@ -174,4 +176,8 @@ binary on this dev machine, so media processing runs through `FakeVideoProcessor
 PATH (the worker container) — see plan.md Week 3 notes; private media storage is a
 filesystem-backed `LocalStorageProvider` (`app/providers/storage.py`) with HMAC-signed, time-limited
 URLs simulating Supabase Storage's signed-URL behaviour — swap in a Supabase-backed implementation
-of the same interface once a project exists.
+of the same interface once a project exists; `platform_limits` seed values (FR-026) are placeholders
+pending verification against current platform documentation (D-07) — see
+`app/services/platform_limits.py` and the migration's own comments; this dev machine's Python
+needed the `tzdata` package added to make `zoneinfo` IANA-aware at all (Windows ships no bundled
+tz database) — worth checking the deploy target has it too, though Linux containers normally do.

@@ -7,7 +7,7 @@ output would have to pass (app/services/scripture.py).
 import hashlib
 
 from app.db.models import BrandProfile
-from app.providers.llm import HookDraft, HooksDraft, LLMProvider, ScriptDraft, SectionDraft
+from app.providers.llm import CaptionDraft, HookDraft, HooksDraft, LLMProvider, ScriptDraft, SectionDraft
 
 MODEL_ID = "fake-llm-v1"
 PROMPT_VERSION = "2026-10-script-v1"
@@ -109,3 +109,29 @@ class FakeLLMProvider(LLMProvider):
         }.get(section, f"Here's more on {topic}.")
 
         return SectionDraft(text=text, model_id=MODEL_ID, prompt_version=PROMPT_VERSION)
+
+    async def generate_caption(
+        self,
+        *,
+        platform: str,
+        topic: str,
+        script_sections: dict[str, str],
+        brand_profile: BrandProfile,
+    ) -> CaptionDraft:
+        hook_text = script_sections.get("hook", f"Let's talk about {topic}.")
+        cta_text = script_sections.get("closing_cta", "Follow for more.")
+
+        platform_captions = {
+            "instagram": f"{hook_text}\n\n{topic} isn't always easy — but we don't walk through it alone.",
+            "tiktok": f"{hook_text} 👀 Here's what I mean about {topic}.",
+            "facebook": f"{hook_text}\n\nA short word on {topic} for anyone who needs it today.",
+            "x": f"{hook_text[:200]} On {topic}:",
+        }
+        caption = platform_captions.get(platform, hook_text)
+
+        base_tags = ["faith", "christian", topic.lower().replace(" ", "")]
+        hashtags = [f"#{tag}" for tag in base_tags if tag]
+
+        return CaptionDraft(
+            caption=caption, hashtags=hashtags, cta=cta_text, model_id=MODEL_ID, prompt_version=PROMPT_VERSION
+        )

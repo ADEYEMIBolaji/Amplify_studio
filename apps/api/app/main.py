@@ -7,6 +7,8 @@ from app.routers import (
     brand_profile,
     hooks,
     media,
+    platform_limits,
+    posts,
     projects,
     references,
     scripts,
@@ -38,6 +40,8 @@ app.include_router(references.router)
 app.include_router(media.router)
 app.include_router(transcripts.router)
 app.include_router(vocabulary.router)
+app.include_router(posts.router)
+app.include_router(platform_limits.router)
 
 
 @app.get("/health")

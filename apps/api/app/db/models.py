@@ -17,7 +17,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from app.db.base import Base
-from app.db.types import GUID
+from app.db.types import GUID, UTCDateTime
 
 # Mirrors supabase/migrations/0001_init.sql, which is the schema's source of
 # truth (FRD section 5). Keep both in sync when a field changes.
@@ -235,10 +235,10 @@ class SocialPost(Base):
         GUID, ForeignKey("media_assets.id"), nullable=True
     )
     status: Mapped[str] = mapped_column(String, default="draft")
-    scheduled_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     timezone: Mapped[str] = mapped_column(String, default="Europe/London")
     posting_slot: Mapped[str | None] = mapped_column(String, nullable=True)
-    published_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     external_post_id: Mapped[str | None] = mapped_column(String, nullable=True)
     external_url: Mapped[str | None] = mapped_column(String, nullable=True)
     is_historical: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -252,8 +252,8 @@ class Reminder(Base):
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
     social_post_id: Mapped[uuid.UUID] = mapped_column(GUID, ForeignKey("social_posts.id"), nullable=False)
     channel: Mapped[str] = mapped_column(String, default="email")
-    send_at: Mapped[datetime] = mapped_column(nullable=False)
-    sent_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    send_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
@@ -416,4 +416,20 @@ class MediaJob(Base):
     error_code: Mapped[str | None] = mapped_column(String, nullable=True)
     result_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class PlatformLimit(Base):
+    __tablename__ = "platform_limits"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=new_uuid)
+    platform: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    caption_max_chars: Mapped[int] = mapped_column(Integer, nullable=False)
+    caption_max_chars_premium: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_max_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    duration_max_seconds_premium: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    hashtag_max_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    aspect_ratio: Mapped[str] = mapped_column(String, default="9:16")
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())

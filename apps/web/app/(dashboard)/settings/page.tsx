@@ -21,6 +21,7 @@ export default function SettingsPage() {
   const [wpm, setWpm] = useState(150);
   const [timezone, setTimezone] = useState("Europe/London");
   const [englishVariant, setEnglishVariant] = useState("UK");
+  const [xPremium, setXPremium] = useState(false);
 
   useEffect(() => {
     api
@@ -36,6 +37,7 @@ export default function SettingsPage() {
         setWpm(p.wpm);
         setTimezone(p.timezone);
         setEnglishVariant(p.english_variant);
+        setXPremium(Boolean(p.platform_flags_json.x_premium));
       })
       .catch((err: ApiError) => setError(err.message));
   }, []);
@@ -56,6 +58,7 @@ export default function SettingsPage() {
         wpm,
         timezone,
         english_variant: englishVariant,
+        platform_flags_json: { ...profile?.platform_flags_json, x_premium: xPremium },
       });
       setProfile(updated);
       setSaved(true);
@@ -159,6 +162,13 @@ export default function SettingsPage() {
           <option value="US">US</option>
         </select>
       </Field>
+
+      <div className="space-y-1">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={xPremium} onChange={(e) => setXPremium(e.target.checked)} />
+          X Premium account (raises the caption and video-length limits — FR-026)
+        </label>
+      </div>
 
       {error && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
