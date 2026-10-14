@@ -130,6 +130,7 @@ class ScriptureReference(Base):
     source: Mapped[str] = mapped_column(String, nullable=False)
     verified_by: Mapped[uuid.UUID | None] = mapped_column(GUID, ForeignKey("users.id"), nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    pasted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 

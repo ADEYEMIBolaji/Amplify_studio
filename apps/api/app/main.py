@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.errors import register_exception_handlers
-from app.routers import brand_profile, projects, topic_tags
+from app.routers import brand_profile, hooks, projects, references, scripts, topic_tags
 
 settings = get_settings()
 
@@ -22,6 +22,9 @@ register_exception_handlers(app)
 app.include_router(projects.router)
 app.include_router(topic_tags.router)
 app.include_router(brand_profile.router)
+app.include_router(scripts.router)
+app.include_router(hooks.router)
+app.include_router(references.router)
 
 
 @app.get("/health")

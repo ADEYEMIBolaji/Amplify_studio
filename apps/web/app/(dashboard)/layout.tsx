@@ -6,6 +6,7 @@ import SignOutButton from "@/components/SignOutButton";
 const NAV = [
   { href: "/dashboard", label: "Home" },
   { href: "/projects", label: "Projects" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {

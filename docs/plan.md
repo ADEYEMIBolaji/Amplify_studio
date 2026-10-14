@@ -68,7 +68,37 @@ confirm Tailwind-default styling is fine through the pilot.
 
 ---
 
-## Week 2 — Script, hooks, scripture, teleprompter (Prompter-only)
+## Week 2 — Script, hooks, scripture, teleprompter (Prompter-only) — ✅ done (2026-10-14)
+
+Delivered: everything in "Must ship" below shipped. `LLMProvider`/`FakeLLMProvider` interface;
+AI outline generation producing the 5-part structured script with per-section provenance
+(`ai`/`manual`, rolled up to the version's `ai`/`manual`/`mixed`); manual edits always create a
+new version rather than mutating one in place; section regeneration blocked with
+`manual_edit_would_be_overwritten` (409) unless `confirm: true`; hook variants (2-3, labelled,
+selectable, unused ones retained); scripture references auto-synced from `{{Book Ch:V}}`
+placeholders found in generated text, with verify/unverify-on-edit and an Owner-paste path;
+`validate_no_quoted_verse_text` rejects AI output that quotes a known verse verbatim; verse
+expansion from the local WEB sample or Owner-pasted text, "Unavailable" otherwise; Script Studio
+UI (hooks, section editor with save/regenerate, version history/restore, approve, reference
+verification); full-screen teleprompter (font size, speed, mirror, 3-2-1 countdown, tap
+pause/resume, Screen Wake Lock with an on-screen fallback notice, auto-scroll); voice-profile
+Settings page. 14 new backend tests (30 total) + 2 new frontend test files (3 files, 5 tests
+total, one covering the new Settings page) all pass; `ruff`, `mypy`, `eslint`, `tsc --noEmit`,
+`next build` all pass clean; first Playwright e2e spec added and run against a live `next dev`
+server.
+
+**Known limitation (flagging, not hiding):** the local WEB verse corpus
+(`apps/api/app/providers/data/web_sample.json`) seeds only ~10 commonly-cited verses, not the full
+Bible. `expand-verses` correctly reports any reference outside that set as "Unavailable" and the
+UI offers the Owner-paste fallback — the mechanism is real and tested (see
+`test_expand_verses_reports_unavailable_outside_local_sample`), but coverage is deliberately small
+for Week 2. Expanding it is pure data entry (add entries to that JSON file) whenever you want
+broader coverage — let me know if you'd like that prioritised before Week 3, or want a path to a
+full local WEB text file instead.
+
+**Not done (scope note, not a cut):** FR-021's "tags required before Ready" gate isn't wired into
+the state machine yet. Nothing can reach Ready until Week 3-4 ship rendering/platform checks, so
+there was nothing to gate yet — this is picked up when the Ready transition becomes reachable.
 
 **Must ship**
 - Creator voice profile completion: tone descriptors, 2–5 sample scripts, preferred/avoid phrases,

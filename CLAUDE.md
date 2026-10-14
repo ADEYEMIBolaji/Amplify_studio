@@ -157,10 +157,11 @@ sync when a field changes.
   Week 5 stretch, after manual metric entry works.
 
 ## Status
-Week 1 (foundation) built — see [docs/plan.md](docs/plan.md) for what shipped, what's stubbed,
-and what's next. Weeks 2–6 not yet started.
+Weeks 1–2 built — see [docs/plan.md](docs/plan.md) for what shipped, what's stubbed, and what's
+next. Weeks 3–6 not yet started.
 
-Open from Week 1: no `docs/design/` handoff yet (UI follows Tailwind defaults + FRD section 6);
-migration tooling is Supabase CLI SQL files (`supabase/migrations/`), consumed by the backend via
+Open: no `docs/design/` handoff yet (UI follows Tailwind defaults + FRD section 6); migration
+tooling is Supabase CLI SQL files (`supabase/migrations/`), consumed by the backend via
 SQLAlchemy Core, no ORM-driven schema generation; D-03/D-04/D-05/D-06 provider choices still open
-(fakes/console logging stand in).
+(fakes/console logging stand in); the local WEB verse corpus (`app/providers/data/web_sample.json`)
+covers only ~10 commonly-cited verses, not the full Bible — see plan.md Week 2 notes.

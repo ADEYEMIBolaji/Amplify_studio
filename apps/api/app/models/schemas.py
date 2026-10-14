@@ -94,6 +94,94 @@ class BrandProfileUpdate(BaseModel):
     timezone: str | None = None
 
 
+class SectionOut(BaseModel):
+    text: str
+    source: str  # ai | manual
+
+
+class ScriptVersionOut(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    version_no: int
+    sections: dict[str, SectionOut]
+    source: str  # ai | manual | mixed (rollup)
+    approved: bool
+    ai_job_id: uuid.UUID | None
+    word_count: int
+    estimated_duration_seconds: float
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ScriptManualEditRequest(BaseModel):
+    sections: dict[str, str] = Field(min_length=1)
+
+
+class RegenerateSectionRequest(BaseModel):
+    section: str
+    confirm: bool = False
+
+
+class HookVariantOut(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    text: str
+    hook_type: str
+    selected: bool
+
+    model_config = {"from_attributes": True}
+
+
+class HookSelectRequest(BaseModel):
+    selected: bool = True
+
+
+# ---------------------------------------------------------------------------
+# Scripture references — FR-003, FR-023
+# ---------------------------------------------------------------------------
+
+
+class ScriptureReferenceCreate(BaseModel):
+    reference: str = Field(description="e.g. 'John 3:16' or '1 Corinthians 13:4-7'")
+    translation: str = "WEB"
+
+
+class ScriptureReferenceUpdate(BaseModel):
+    reference: str | None = None
+    translation: str | None = None
+    pasted_text: str | None = None
+
+
+class ScriptureReferenceOut(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    book: str
+    chapter: int
+    verse_start: int
+    verse_end: int | None
+    reference: str
+    translation: str
+    source: str  # ai | user
+    verified_by: uuid.UUID | None
+    verified_at: datetime | None
+    pasted_text: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class ExpandedReferenceOut(BaseModel):
+    reference: str
+    text: str | None
+    translation: str
+    unavailable: bool = False
+
+
+class ExpandVersesResponse(BaseModel):
+    sections: dict[str, str]
+    references: list[ExpandedReferenceOut]
+
+
 class BrandProfileOut(BaseModel):
     id: uuid.UUID
     workspace_id: uuid.UUID

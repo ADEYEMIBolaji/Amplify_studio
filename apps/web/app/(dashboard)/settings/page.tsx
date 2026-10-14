@@ -1,0 +1,195 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { api, ApiError } from "@/lib/api/client";
+import { BrandProfile } from "@/lib/api/types";
+
+/** FR-020 — creator voice profile and guardrails, injected into every
+ * script, hook and caption prompt. */
+export default function SettingsPage() {
+  const [profile, setProfile] = useState<BrandProfile | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const [tone, setTone] = useState("");
+  const [tradition, setTradition] = useState("");
+  const [phrasesPrefer, setPhrasesPrefer] = useState("");
+  const [phrasesAvoid, setPhrasesAvoid] = useState("");
+  const [guardrails, setGuardrails] = useState("");
+  const [avoidTopics, setAvoidTopics] = useState("");
+  const [wpm, setWpm] = useState(150);
+  const [timezone, setTimezone] = useState("Europe/London");
+  const [englishVariant, setEnglishVariant] = useState("UK");
+
+  useEffect(() => {
+    api
+      .get<BrandProfile>("/api/brand-profile")
+      .then((p) => {
+        setProfile(p);
+        setTone(p.tone ?? "");
+        setTradition(p.tradition ?? "");
+        setPhrasesPrefer(p.phrases_prefer.join("\n"));
+        setPhrasesAvoid(p.phrases_avoid.join("\n"));
+        setGuardrails(p.guardrails_json.join("\n"));
+        setAvoidTopics(p.avoid_topics.join("\n"));
+        setWpm(p.wpm);
+        setTimezone(p.timezone);
+        setEnglishVariant(p.english_variant);
+      })
+      .catch((err: ApiError) => setError(err.message));
+  }, []);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setSaved(false);
+    setError(null);
+    try {
+      const updated = await api.patch<BrandProfile>("/api/brand-profile", {
+        tone: tone || null,
+        tradition: tradition || null,
+        phrases_prefer: splitLines(phrasesPrefer),
+        phrases_avoid: splitLines(phrasesAvoid),
+        guardrails_json: splitLines(guardrails),
+        avoid_topics: splitLines(avoidTopics),
+        wpm,
+        timezone,
+        english_variant: englishVariant,
+      });
+      setProfile(updated);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't save your settings.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (error && !profile) {
+    return (
+      <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        {error}
+      </p>
+    );
+  }
+
+  if (!profile) {
+    return <p className="text-sm text-black/60 dark:text-white/60">Loading…</p>;
+  }
+
+  return (
+    <form onSubmit={handleSave} className="max-w-xl space-y-6">
+      <h1 className="text-xl font-semibold">Voice profile and guardrails</h1>
+      <p className="text-sm text-black/60 dark:text-white/60">
+        This is injected into every script, hook and caption the AI generates (FR-020).
+      </p>
+
+      <Field label="Tone">
+        <input
+          value={tone}
+          onChange={(e) => setTone(e.target.value)}
+          placeholder="e.g. warm, direct, encouraging"
+          className="input"
+        />
+      </Field>
+
+      <Field label="Theological tradition">
+        <input value={tradition} onChange={(e) => setTradition(e.target.value)} className="input" />
+      </Field>
+
+      <Field label="Phrases to prefer (one per line)">
+        <textarea
+          value={phrasesPrefer}
+          onChange={(e) => setPhrasesPrefer(e.target.value)}
+          rows={3}
+          className="input"
+        />
+      </Field>
+
+      <Field label="Phrases to avoid (one per line)">
+        <textarea
+          value={phrasesAvoid}
+          onChange={(e) => setPhrasesAvoid(e.target.value)}
+          rows={3}
+          className="input"
+        />
+      </Field>
+
+      <Field label="Doctrinal guardrails (one per line)">
+        <textarea
+          value={guardrails}
+          onChange={(e) => setGuardrails(e.target.value)}
+          rows={3}
+          className="input"
+        />
+      </Field>
+
+      <Field label="Topics to avoid or handle with care (one per line)">
+        <textarea
+          value={avoidTopics}
+          onChange={(e) => setAvoidTopics(e.target.value)}
+          rows={3}
+          className="input"
+        />
+      </Field>
+
+      <Field label="Words per minute (used for duration estimates)">
+        <input
+          type="number"
+          min={80}
+          max={220}
+          value={wpm}
+          onChange={(e) => setWpm(Number(e.target.value))}
+          className="input"
+        />
+      </Field>
+
+      <Field label="Timezone (IANA)">
+        <input value={timezone} onChange={(e) => setTimezone(e.target.value)} className="input" />
+      </Field>
+
+      <Field label="English variant">
+        <select
+          value={englishVariant}
+          onChange={(e) => setEnglishVariant(e.target.value)}
+          className="input"
+        >
+          <option value="UK">UK</option>
+          <option value="US">US</option>
+        </select>
+      </Field>
+
+      {error && (
+        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      )}
+      {saved && <p className="text-sm text-green-700 dark:text-green-400">Saved.</p>}
+
+      <button
+        type="submit"
+        disabled={saving}
+        className="rounded bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+      >
+        {saving ? "Saving…" : "Save"}
+      </button>
+    </form>
+  );
+}
+
+function splitLines(value: string): string[] {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-sm font-medium">{label}</label>
+      {children}
+    </div>
+  );
+}

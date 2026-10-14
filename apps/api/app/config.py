@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     default_timezone: str = "Europe/London"
     default_wpm: int = 150
 
+    llm_provider: str = "fake"
+    transcription_provider: str = "fake"
+    reminder_provider: str = "console"
+
     @property
     def is_development(self) -> bool:
         return self.env == "development"
