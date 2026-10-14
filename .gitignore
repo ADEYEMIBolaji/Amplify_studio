@@ -10,3 +10,11 @@ dist/
 build/
 *.log
 .DS_Store
+*.db
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+playwright-report/
+test-results/
+coverage/
+*.tsbuildinfo

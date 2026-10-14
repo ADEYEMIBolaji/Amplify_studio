@@ -9,7 +9,31 @@ No application code is written until this plan is approved.
 
 ---
 
-## Week 1 — Foundation, auth, projects, state machine
+## Week 1 — Foundation, auth, projects, state machine — ✅ done (2026-10-14)
+
+Delivered: Next.js/FastAPI scaffolding, full schema migration (see CLAUDE.md "Schema note"),
+Supabase auth wiring (login page, session-refresh proxy, per-user workspace provisioning),
+project CRUD + archive, the full forward/backward state machine with real precondition checks
+against later-week tables, topic tags, brand profile basics, and workspace-ownership checks on
+every handler (tested — AT-07 partial). 19 backend tests (pytest) + 3 frontend tests (Vitest) all
+pass; `ruff`, `mypy`, `eslint`, `tsc --noEmit`, and `next build` all pass clean.
+
+Stubbed/deferred: audit log has no viewer UI (writes happen, nothing surfaces them yet — this was
+always this week's stretch item); `docker-compose.yml` is written but untested (no Docker in this
+build environment — verify once Docker is available); no Supabase project is linked yet, so the
+backend runs against local SQLite and the frontend auth flow is wired but unverified against a
+real Supabase instance; home dashboard shows only a pipeline-by-state placeholder (full FR-025
+version is Week 5); Playwright is configured but has no e2e spec yet (first one comes with Week 2
+once there's a full idea→script flow worth covering end to end).
+
+**Decisions made (flagging, not asking):** Supabase CLI SQL migrations + SQLAlchemy Core (no ORM
+migration generation) — matches the plan's open item. Full data-model schema created in Week 1
+rather than growing it per-week, since FRD section 5 already specifies it completely and it lets
+the state machine's later-state conditions be real checks instead of stubs.
+
+**Needs you:** (1) a Supabase project — create one and share the URL/keys so Week 2 can run
+against real auth/DB instead of local SQLite; (2) confirm the `docs/design/` handoff is coming, or
+confirm Tailwind-default styling is fine through the pilot.
 
 **Must ship**
 - Repo scaffolding: `apps/web` (Next.js/TS/Tailwind), `apps/api` (FastAPI/Python 3.12),

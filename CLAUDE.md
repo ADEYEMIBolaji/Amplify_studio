@@ -42,36 +42,54 @@ with the **service role**, which bypasses Postgres RLS (FRD section 1, NFR Secur
 │   ├── plan.md                     # sprint plan, must-ship/stretch, FR/AT mapping
 │   └── design/                     # Claude Design handoff — not yet provided
 ├── apps/
-│   ├── web/                        # Next.js App Router app
-│   │   ├── app/                    # routes: dashboard, ideas, scripts, record, video, repurpose, calendar, growth-lab, settings
+│   ├── web/                        # Next.js App Router app (TypeScript, Tailwind v4)
+│   │   ├── app/
+│   │   │   ├── login/               # Supabase email/password sign-in
+│   │   │   └── (dashboard)/         # authenticated shell (layout redirects to /login if signed out)
+│   │   │       ├── dashboard/       # home — pipeline-by-state placeholder until FR-025 (Week 5)
+│   │   │       └── projects/        # FR-002 list/create; [id] for edit/archive/transition
 │   │   ├── components/
-│   │   ├── lib/                    # api client, types shared with backend contracts
-│   │   └── tests/                  # Vitest + Playwright
-│   └── api/                        # FastAPI app
+│   │   ├── lib/
+│   │   │   ├── supabase/            # browser/server/middleware Supabase clients
+│   │   │   └── api/                 # fetch client (attaches Supabase access token) + shared types
+│   │   ├── proxy.ts                 # Next.js 16 proxy (session refresh + auth gate on every route)
+│   │   └── tests/                   # Vitest (tests/unit) + Playwright (tests/e2e)
+│   └── api/                        # FastAPI app (Python 3.12)
 │       ├── app/
-│       │   ├── routers/            # one module per FRD domain (projects, scripts, media, posts, metrics, ...)
-│       │   ├── models/             # Pydantic schemas
-│       │   ├── db/                 # SQLAlchemy models / Supabase migrations
-│       │   ├── providers/          # LLMProvider, TranscriptionProvider + Fake implementations
-│       │   ├── services/           # business logic (state machine, metrics calc, insights rules)
-│       │   └── worker/             # queue consumer, FFmpeg jobs, AI jobs
-│       └── tests/                  # pytest
+│       │   ├── routers/            # projects, topic_tags, brand_profile so far
+│       │   ├── models/schemas.py   # Pydantic request/response models
+│       │   ├── db/                 # SQLAlchemy models (models.py) mirroring the Supabase migration, base.py, portable GUID type
+│       │   ├── providers/          # LLMProvider, TranscriptionProvider + Fake implementations — empty until Week 2/3
+│       │   ├── services/           # state_machine.py (FRD 1.1), audit.py; metrics/insights land Weeks 5-6
+│       │   ├── worker/             # queue consumer — stub main.py until Week 3
+│       │   ├── auth.py             # Supabase JWT verification
+│       │   ├── deps.py             # DB session + get_current_workspace (provisions user/workspace on first call)
+│       │   └── errors.py           # AppError hierarchy -> typed {code, message} JSON
+│       └── tests/                  # pytest — conftest.py overrides auth/DB deps with SQLite + a settable fake user
 ├── supabase/
-│   └── migrations/                 # SQL migrations, timestamped
-├── docker-compose.yml
+│   └── migrations/0001_init.sql    # full schema from FRD section 5 (see note below), RLS policies
+├── docker-compose.yml              # web/api/worker — untested locally (no Docker in this environment)
 ├── .env.example
 └── CLAUDE.md
 ```
-(Structure is created incrementally as each sprint week is built — see [docs/plan.md](docs/plan.md).)
+
+**Schema note:** the FRD already fully specifies the data model (section 5), so `0001_init.sql`
+creates every table up front rather than growing the schema piecemeal — this lets the project
+state machine's later-state conditions (Recorded, Subtitled, Ready, Scheduled, Published,
+Measured) query real tables from Week 1, even though most stay empty until the feature that
+populates them ships. `apps/api/app/db/models.py` mirrors this schema in SQLAlchemy; keep both in
+sync when a field changes.
 
 ## Commands
-_Filled in once scaffolding exists in Week 1. Placeholder targets:_
-- Dev: `docker-compose up` (web on :3000, api on :8000)
-- Frontend test: `cd apps/web && npm run test` (Vitest), `npm run test:e2e` (Playwright)
-- Backend test: `cd apps/api && pytest`
+- Dev (frontend): `cd apps/web && npm run dev` (:3000)
+- Dev (backend): `cd apps/api && source .venv/Scripts/activate && uvicorn app.main:app --reload` (:8000)
+- Dev (all, once Docker is available): `docker-compose up`
+- Frontend test: `cd apps/web && npm run test` (Vitest), `npm run test:e2e` (Playwright, needs the dev server running)
+- Backend test: `cd apps/api && source .venv/Scripts/activate && pytest` (SQLite in-memory; no external services needed)
 - Lint: `cd apps/web && npm run lint`; `cd apps/api && ruff check .`
 - Type check: `cd apps/web && npm run typecheck`; `cd apps/api && mypy app`
-- Migrate: `supabase migration up` (or `alembic upgrade head` if SQLAlchemy migrations are used instead — decide in Week 1 and update this line)
+- Migrate: SQL migrations in `supabase/migrations/`, applied via `supabase db push` (Supabase CLI) against the linked project, or pasted into the Supabase SQL editor. Local dev defaults to SQLite (`DATABASE_URL` in `.env`) so the backend runs without Supabase during Week 1 — point `DATABASE_URL` at the Supabase Postgres connection string once a project exists.
+- Python backend uses a venv at `apps/api/.venv` (not committed); `pip install -r requirements.txt` after creating it.
 
 ## Coding conventions
 - UK English throughout the UI (copy, labels, error messages, dates).
@@ -139,5 +157,10 @@ _Filled in once scaffolding exists in Week 1. Placeholder targets:_
   Week 5 stretch, after manual metric entry works.
 
 ## Status
-Project not yet scaffolded. See [docs/plan.md](docs/plan.md) for the sprint plan — awaiting
-approval before any application code is written.
+Week 1 (foundation) built — see [docs/plan.md](docs/plan.md) for what shipped, what's stubbed,
+and what's next. Weeks 2–6 not yet started.
+
+Open from Week 1: no `docs/design/` handoff yet (UI follows Tailwind defaults + FRD section 6);
+migration tooling is Supabase CLI SQL files (`supabase/migrations/`), consumed by the backend via
+SQLAlchemy Core, no ORM-driven schema generation; D-03/D-04/D-05/D-06 provider choices still open
+(fakes/console logging stand in).
