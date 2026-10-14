@@ -101,14 +101,22 @@ export default function ProjectDetailPage() {
         </p>
       )}
 
-      {latest && (
+      <div className="flex gap-2">
+        {latest && (
+          <Link
+            href={`/projects/${projectId}/teleprompter`}
+            className="inline-block rounded bg-black px-3 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+          >
+            Open teleprompter
+          </Link>
+        )}
         <Link
-          href={`/projects/${projectId}/teleprompter`}
-          className="inline-block rounded bg-black px-3 py-2 text-sm font-medium text-white dark:bg-white dark:text-black"
+          href={`/projects/${projectId}/video`}
+          className="inline-block rounded border border-black/20 px-3 py-2 text-sm font-medium dark:border-white/20"
         >
-          Open teleprompter
+          Video Studio
         </Link>
-      )}
+      </div>
 
       {/* Hooks — FR-022 */}
       <section className="space-y-3">

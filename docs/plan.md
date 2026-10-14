@@ -134,7 +134,36 @@ there was nothing to gate yet — this is picked up when the Ready transition be
 
 ---
 
-## Week 3 — Upload, transcription, subtitles, SRT export
+## Week 3 — Upload, transcription, subtitles, SRT export — ✅ done (2026-10-14)
+
+Delivered: chunked resumable upload (`media_upload_sessions`) — a dropped connection loses at most
+the in-flight chunk, resumed by probing which chunk indices already landed; MIME/extension/size
+validation; `StorageProvider` abstraction with a filesystem-backed `LocalStorageProvider` giving
+real HMAC-signed, time-limited download URLs (simulating Supabase Storage's signed-URL property
+until a project exists); `VideoProcessor` abstraction (`normalize`/`render_captions`) with a real
+FFmpeg-shelling implementation plus a `FakeVideoProcessor` fallback; `TranscriptionProvider` +
+`FakeTranscriptionProvider`; a `media_jobs` table (same pattern as `ai_jobs`) giving every
+normalize/transcribe/render a status, retry count and idempotency key, processed inline for
+instant pilot-scale UX with a worker poll loop (`app/worker/main.py`) as crash-recovery backstop;
+subtitle text/timing correction that persists; "mark reviewed" wired into the state machine's
+Subtitled condition (built in Week 1, exercised for the first time here); SRT export; seeded
+biblical-name vocabulary + Owner additions; a Video Studio page (upload progress, transcribe,
+subtitle editor, SRT download). 13 new backend tests (43 total) all passing; `ruff`, `mypy`,
+`eslint`, `tsc`, `next build` all pass clean.
+
+**Known limitation (flagging, not hiding):** this dev machine has no `ffmpeg`/`ffprobe` binary, so
+every upload runs through `FakeVideoProcessor` — it copies the file through unchanged and marks
+the result `metadata_json.degraded: true` rather than claiming real HEVC→H.264/CFR normalisation
+happened. The real `FfmpegVideoProcessor` is written and will run as soon as `VIDEO_PROCESSOR=ffmpeg`
+is set somewhere `ffmpeg`/`ffprobe` are actually on PATH (the worker container, per CLAUDE.md) —
+it just hasn't been exercised against a real video file yet. Test before relying on it for a real
+upload.
+
+**Stretch not attempted this week:** burn-in rendering (styled captions, safe zones, loudness
+normalisation) — `VideoProcessor.render_captions` exists but has no router wired to it yet. This
+was always the first thing to cut if the week was tight (per the plan's own stretch-cut order),
+and SRT-only export is sufficient to keep moving; happy to prioritise it ahead of Week 4 if you'd
+rather have it sooner.
 
 **Must ship**
 - Resumable upload endpoint; MP4/MOV accepted within configurable limits (default ≤500MB, ≤5min);

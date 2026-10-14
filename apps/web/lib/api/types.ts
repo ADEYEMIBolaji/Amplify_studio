@@ -122,6 +122,54 @@ export interface ExpandVersesResponse {
   references: ExpandedReference[];
 }
 
+export interface MediaUploadSession {
+  id: string;
+  project_id: string;
+  filename: string;
+  total_size: number;
+  chunk_size: number;
+  total_chunks: number;
+  received_chunks: number[];
+  status: "pending" | "completed" | "aborted";
+}
+
+export type MediaAssetKind = "source" | "render" | "srt";
+
+export interface MediaAsset {
+  id: string;
+  project_id: string;
+  kind: MediaAssetKind;
+  status: string;
+  duration_seconds: number | null;
+  width: number | null;
+  height: number | null;
+  metadata_json: Record<string, unknown>;
+  download_url: string | null;
+}
+
+export interface MediaJob {
+  id: string;
+  media_asset_id: string;
+  job_type: "normalize" | "transcribe" | "render";
+  status: "pending" | "running" | "succeeded" | "failed";
+  retry_count: number;
+  error_code: string | null;
+  result_json: Record<string, unknown> | null;
+}
+
+export interface TranscriptSegmentItem {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface Transcript {
+  id: string;
+  media_asset_id: string;
+  segments: TranscriptSegmentItem[];
+  reviewed_at: string | null;
+}
+
 export interface BrandProfile {
   id: string;
   workspace_id: string;

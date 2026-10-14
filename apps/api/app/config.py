@@ -21,6 +21,15 @@ class Settings(BaseSettings):
     llm_provider: str = "fake"
     transcription_provider: str = "fake"
     reminder_provider: str = "console"
+    video_processor: str = "fake"
+
+    storage_root: str = "./.storage"
+    media_signing_secret: str = "dev-signing-secret-change-me"
+    public_api_base_url: str = "http://localhost:8000"
+    signed_url_expiry_seconds: int = 900
+
+    max_upload_bytes: int = 500 * 1024 * 1024
+    max_upload_duration_seconds: int = 300
 
     @property
     def is_development(self) -> bool:

@@ -182,6 +182,89 @@ class ExpandVersesResponse(BaseModel):
     references: list[ExpandedReferenceOut]
 
 
+class MediaUploadInitRequest(BaseModel):
+    project_id: uuid.UUID
+    filename: str
+    content_type: str
+    total_size: int = Field(gt=0)
+    chunk_size: int = Field(default=5_000_000, gt=0)
+
+
+class MediaUploadSessionOut(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    filename: str
+    total_size: int
+    chunk_size: int
+    total_chunks: int
+    received_chunks: list[int]
+    status: str
+
+    model_config = {"from_attributes": True}
+
+
+class MediaUploadCompleteOut(BaseModel):
+    media_asset_id: uuid.UUID
+    job_id: uuid.UUID
+
+
+class MediaAssetOut(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    kind: str
+    status: str
+    duration_seconds: float | None
+    width: int | None
+    height: int | None
+    metadata_json: dict
+    download_url: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class MediaJobOut(BaseModel):
+    id: uuid.UUID
+    media_asset_id: uuid.UUID
+    job_type: str
+    status: str
+    retry_count: int
+    error_code: str | None
+    result_json: dict | None
+
+    model_config = {"from_attributes": True}
+
+
+class TranscriptSegmentSchema(BaseModel):
+    start: float
+    end: float
+    text: str
+
+
+class TranscriptOut(BaseModel):
+    id: uuid.UUID
+    media_asset_id: uuid.UUID
+    segments: list[TranscriptSegmentSchema]
+    reviewed_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class TranscriptUpdateRequest(BaseModel):
+    segments: list[TranscriptSegmentSchema] = Field(min_length=1)
+
+
+class CustomVocabularyOut(BaseModel):
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    term: str
+
+    model_config = {"from_attributes": True}
+
+
+class CustomVocabularyCreate(BaseModel):
+    term: str = Field(min_length=1, max_length=100)
+
+
 class BrandProfileOut(BaseModel):
     id: uuid.UUID
     workspace_id: uuid.UUID

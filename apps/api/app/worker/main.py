@@ -1,18 +1,43 @@
-"""Background worker entry point.
+"""Background worker — polls for `media_jobs` left `pending`.
 
-Stub for Week 1 — the queue consumer (transcription, FFmpeg rendering, AI
-jobs) is built starting Week 3 per docs/plan.md. Running this now just
-confirms the container wiring works end to end.
+The API processes a job inline right after enqueueing it (so the fake
+providers feel instant for the single-user pilot); this loop exists to pick
+up anything left pending after a crash or a real (slow) provider timing out
+mid-request — that's the actual point of tracking status/retry_count in the
+DB rather than only awaiting the call directly. AI jobs (ai_jobs) don't need
+this: FR-004/022 calls are synchronous request/response today.
 """
 
-import time
+import asyncio
+
+from sqlalchemy import select
+
+from app.db.base import AsyncSessionLocal
+from app.db.models import MediaJob
+from app.services.media_jobs import process_job
+
+POLL_INTERVAL_SECONDS = 5
 
 
-def main() -> None:
-    print("Amplify Studio worker: no jobs to process yet (ships Week 3). Idling.")
+async def run_once() -> int:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(MediaJob).where(MediaJob.status == "pending"))
+        jobs = list(result.scalars().all())
+        for job in jobs:
+            await process_job(db, job)
+        await db.commit()
+        return len(jobs)
+
+
+async def main() -> None:
+    print("Amplify Studio worker: polling media_jobs every "
+          f"{POLL_INTERVAL_SECONDS}s for pending transcription/render/normalize jobs.")
     while True:
-        time.sleep(60)
+        processed = await run_once()
+        if processed:
+            print(f"Worker: processed {processed} job(s).")
+        await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
