@@ -257,7 +257,44 @@ burn-in lands.
 
 ---
 
-## Week 5 — Growth Lab: metrics, baseline, dashboards
+## Week 5 — Growth Lab: metrics, baseline, dashboards — ✅ done (2026-10-15)
+
+Delivered: a `metrics.py` calculation service with every FR-015 non-negotiable rule
+mechanically enforced — one snapshot picked per post per window (never summed), reach per post
+is a median, "total reach in window" (followers-per-1,000 only) is a sum, posts without a
+day-window snapshot are excluded and counted separately in data coverage rather than treated as
+zero, nothing ever sums reach across platforms since every query is scoped to one platform;
+manual metric entry with validation (negative counts, out-of-range completion rate, a snapshot
+can't predate its post's publish date), duplicate handling requiring an explicit update/skip
+choice, and a "cumulative dip" flag that warns without blocking; follower snapshots; historical
+baseline import (no project required, tags captured in a new `social_posts.tags_json` column,
+labelled historical); a Growth Lab page (platform/range selector, current-vs-previous table,
+"Unavailable" rendered for missing values — never `0`, low-sample and low-confidence banners);
+the real FR-025 home dashboard (next action per project, pipeline counts, weekly posting
+adherence, reach/follower sparklines) replacing Week 1's placeholder. 21 new backend tests (85
+total, including a hand-calculated fixture for AT-05's median/mean/exclusion rules), 2 new
+frontend test files; `ruff`, `mypy`, `eslint`, `tsc`, `next build` all pass clean.
+
+**This week's work also went live against the real Supabase project** (connected mid-Week-4/5,
+per the chat): applied migrations 0001-0005, created the Owner's Auth user, and verified the
+full stack end to end — login, project creation, and the new home dashboard all round-tripped
+against the actual Postgres instance, not just SQLite tests. Along the way: migration 0005 was
+written but not applied to the live DB before testing against it, causing a real 500
+(`social_posts.tags_json does not exist`) — fixed by applying it, and by adding
+`scripts/apply_migrations.py`, a small idempotent runner (tracked via a `schema_migrations`
+table) so a forgotten migration doesn't silently wait to be found by the next live request. This
+is now the documented step after adding any new migration file (see CLAUDE.md).
+
+**Documented aggregation choices the FRD's FR-015 table doesn't fully pin down** (not gaps —
+explicit decisions, flagged in `app/services/metrics.py`'s module docstring): engagement
+rate/share rate/save rate are each computed per eligible post then aggregated across posts with
+the median, matching the FRD's general preference for median over mean elsewhere; the day-28
+window width defaults to ±3 days (only day-7's ±1/"window 6-8" is explicit in the FRD).
+
+**Not done (scope note, not a cut):** CSV import with column mapping remains stretch, unstarted —
+manual entry and historical import cover every AT-05/AT-14 assertion already. Recommendations and
+the weekly review (FR-017/018/019) are Week 6, so "active_experiments" on the home dashboard is
+an empty list for now, not a bug.
 
 **Must ship**
 - Manual metrics entry form (platform, post, captured_at, reach, impressions, views, likes,

@@ -101,6 +101,7 @@ class SocialPostOut(BaseModel):
     external_post_id: str | None
     external_url: str | None
     is_historical: bool
+    tags_json: dict
     created_at: datetime
     updated_at: datetime
 
@@ -134,6 +135,112 @@ class PlatformLimitOut(BaseModel):
     notes: str | None
 
     model_config = {"from_attributes": True}
+
+
+class MetricSnapshotCreate(BaseModel):
+    social_post_id: uuid.UUID
+    captured_at: datetime
+    reach: int | None = None
+    impressions: int | None = None
+    views: int | None = None
+    likes: int | None = None
+    comments: int | None = None
+    shares: int | None = None
+    saves: int | None = None
+    watch_seconds_avg: float | None = None
+    completion_rate: float | None = None
+    profile_visits: int | None = None
+    on_duplicate: str | None = Field(default=None, description="'update' or 'skip' if a duplicate exists")
+
+
+class MetricSnapshotOut(BaseModel):
+    id: uuid.UUID
+    social_post_id: uuid.UUID
+    platform: str
+    captured_at: datetime
+    days_since_publish: int | None
+    reach: int | None
+    impressions: int | None
+    views: int | None
+    likes: int | None
+    comments: int | None
+    shares: int | None
+    saves: int | None
+    watch_seconds_avg: float | None
+    completion_rate: float | None
+    profile_visits: int | None
+    flagged_fields: list[str] = []
+
+    model_config = {"from_attributes": True}
+
+
+class FollowerSnapshotCreate(BaseModel):
+    platform: str
+    captured_at: datetime
+    follower_count: int = Field(ge=0)
+
+
+class FollowerSnapshotOut(BaseModel):
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    platform: str
+    captured_at: datetime
+    follower_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class HistoricalSnapshotCreate(BaseModel):
+    captured_at: datetime
+    reach: int | None = None
+    impressions: int | None = None
+    views: int | None = None
+    likes: int | None = None
+    comments: int | None = None
+    shares: int | None = None
+    saves: int | None = None
+    watch_seconds_avg: float | None = None
+    completion_rate: float | None = None
+    profile_visits: int | None = None
+
+
+class HistoricalPostCreate(BaseModel):
+    platform: str
+    external_url: str
+    published_at: datetime
+    tags_json: dict = {}
+    snapshots: list[HistoricalSnapshotCreate] = []
+
+
+class DataCoverageOut(BaseModel):
+    eligible: int
+    total: int
+
+
+class PlatformPeriodMetricsOut(BaseModel):
+    platform: str
+    start: datetime
+    end: datetime
+    target_day: int
+    window_days: int
+    reach_median: float | None
+    reach_mean: float | None
+    engagement_per_reach: float | None
+    share_rate: float | None
+    save_rate: float | None
+    watch_seconds_avg: float | None
+    completion_rate: float | None
+    net_follower_change: float | None
+    net_follower_change_low_confidence: bool
+    followers_per_1000_reached: float | None
+    posting_adherence: float | None
+    data_coverage: DataCoverageOut
+    low_sample: bool
+
+
+class AnalyticsOverviewOut(BaseModel):
+    current: PlatformPeriodMetricsOut
+    previous: PlatformPeriodMetricsOut
 
 
 class BrandProfileUpdate(BaseModel):

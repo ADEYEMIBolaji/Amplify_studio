@@ -242,6 +242,7 @@ class SocialPost(Base):
     external_post_id: Mapped[str | None] = mapped_column(String, nullable=True)
     external_url: Mapped[str | None] = mapped_column(String, nullable=True)
     is_historical: Mapped[bool] = mapped_column(Boolean, default=False)
+    tags_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 

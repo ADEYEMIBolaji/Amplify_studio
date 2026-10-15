@@ -49,6 +49,7 @@ with the **service role**, which bypasses Postgres RLS (FRD section 1, NFR Secur
 │   │   │       ├── dashboard/       # home — pipeline-by-state placeholder until FR-025 (Week 5)
 │   │   │       ├── settings/        # FR-020 voice profile and guardrails, FR-026 X Premium flag
 │   │   │       ├── calendar/        # FR-011/012 schedule, publish, unpublish
+│   │   │       ├── growth-lab/      # FR-013/014/015/016/028/029 metrics, follower snapshots, historical import, period comparison
 │   │   │       └── projects/        # FR-002 list/create; [id] for edit/archive/transition, script, hooks, references
 │   │   │           └── [id]/
 │   │   │               ├── video/          # FR-007/008/009 upload, transcription, subtitle edit, SRT export
@@ -62,18 +63,18 @@ with the **service role**, which bypasses Postgres RLS (FRD section 1, NFR Secur
 │   │   └── tests/                   # Vitest (tests/unit) + Playwright (tests/e2e)
 │   └── api/                        # FastAPI app (Python 3.12)
 │       ├── app/
-│       │   ├── routers/            # projects, topic_tags, brand_profile, scripts, hooks, references, media, transcripts, vocabulary, posts, platform_limits
+│       │   ├── routers/            # projects, topic_tags, brand_profile, scripts, hooks, references, media, transcripts, vocabulary, posts, platform_limits, metrics, dashboard
 │       │   ├── models/schemas.py   # Pydantic request/response models
 │       │   ├── db/                 # SQLAlchemy models (models.py) mirroring the Supabase migration, base.py, portable GUID type
 │       │   ├── providers/          # LLMProvider, TranscriptionProvider, VideoProcessor, StorageProvider + Fake/Local implementations
-│       │   ├── services/           # state_machine.py (FRD 1.1), audit.py, scripts.py, scripture.py, media_jobs.py, srt.py, posts.py (timezone/external-ID parsing), platform_limits.py, reminders.py; metrics/insights land Weeks 5-6
+│       │   ├── services/           # state_machine.py (FRD 1.1), audit.py, scripts.py, scripture.py, media_jobs.py, srt.py, posts.py (timezone/external-ID parsing), platform_limits.py, reminders.py, metrics.py (FR-015 calculations), metric_snapshots.py (FR-013/014 ingestion); recommendations/experiments land Week 6
 │       │   ├── worker/             # polls media_jobs left pending + due reminders (main.py)
 │       │   ├── auth.py             # Supabase JWT verification
 │       │   ├── deps.py             # DB session + get_current_workspace (provisions user/workspace on first call)
 │       │   └── errors.py           # AppError hierarchy -> typed {code, message} JSON
 │       └── tests/                  # pytest — conftest.py overrides auth/DB deps with SQLite + a settable fake user
 ├── supabase/
-│   └── migrations/                 # 0001 full schema from FRD section 5, 0002 scripture pasted_text, 0003 media pipeline, 0004 platform_limits (RLS throughout)
+│   └── migrations/                 # 0001 full schema from FRD section 5, 0002 scripture pasted_text, 0003 media pipeline, 0004 platform_limits, 0005 social_posts.tags_json (RLS throughout)
 ├── docker-compose.yml              # web/api/worker — untested locally (no Docker in this environment)
 ├── .env.example
 └── CLAUDE.md
@@ -163,8 +164,23 @@ sync when a field changes.
   Week 5 stretch, after manual metric entry works.
 
 ## Status
-Weeks 1–4 built — see [docs/plan.md](docs/plan.md) for what shipped, what's stubbed, and what's
-next. Weeks 5–6 not yet started.
+Weeks 1–5 built, and the app is now connected to a real Supabase project (see "Live environment"
+below) — see [docs/plan.md](docs/plan.md) for what shipped, what's stubbed, and what's next.
+Week 6 not yet started.
+
+**Migrations against the live project are not automatic.** There's no Supabase CLI link, so a new
+file in `supabase/migrations/` does nothing by itself — run `python scripts/apply_migrations.py`
+from the repo root (reads `DATABASE_URL` from `apps/api/.env`) after adding one. It tracks what's
+applied in a `schema_migrations` table so it's safe to re-run. Forgetting this once already caused
+a live 500 in Week 5 (`social_posts.tags_json does not exist`) — always run it after writing a new
+migration file, not just when a test fails.
+
+**Live environment:** a real Supabase project is linked (URL/keys in `apps/api/.env` and
+`apps/web/.env.local`, both gitignored). The Owner login lives in Supabase Auth; credentials were
+saved to `.credentials.local` at the repo root (gitignored) — move that to a password manager when
+convenient. `apps/api/app/auth.py` verifies both HS256 (legacy shared-secret) and ES256
+(newer per-project asymmetric key, verified via JWKS) Supabase projects — found this the hard way
+when the first real login attempt failed against this project's ES256 tokens.
 
 Open: no `docs/design/` handoff yet (UI follows Tailwind defaults + FRD section 6); migration
 tooling is Supabase CLI SQL files (`supabase/migrations/`), consumed by the backend via

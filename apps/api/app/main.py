@@ -5,8 +5,10 @@ from app.config import get_settings
 from app.errors import register_exception_handlers
 from app.routers import (
     brand_profile,
+    dashboard,
     hooks,
     media,
+    metrics,
     platform_limits,
     posts,
     projects,
@@ -42,6 +44,8 @@ app.include_router(transcripts.router)
 app.include_router(vocabulary.router)
 app.include_router(posts.router)
 app.include_router(platform_limits.router)
+app.include_router(metrics.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/health")
