@@ -31,6 +31,20 @@ const baseProfile = {
   wpm: 150,
   timezone: "Europe/London",
   platform_flags_json: {},
+  subtitle_style_json: {
+    font_family: "DejaVu Sans",
+    font_size: 48,
+    bold: true,
+    text_colour: "#FFFFFF",
+    background_box: true,
+    background_colour: "#000000",
+    background_opacity: 0.6,
+    max_chars_per_line: 32,
+    max_lines: 2,
+    safe_zone_bottom_pct: 20,
+    safe_zone_right_pct: 12,
+    safe_zone_left_pct: 6,
+  },
   version_no: 1,
 };
 

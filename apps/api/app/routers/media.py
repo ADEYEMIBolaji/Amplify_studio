@@ -82,6 +82,7 @@ def _asset_to_out(asset: MediaAsset) -> dict:
         "height": asset.height,
         "metadata_json": asset.metadata_json,
         "download_url": download_url,
+        "created_at": asset.created_at,
     }
 
 

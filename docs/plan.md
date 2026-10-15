@@ -376,7 +376,7 @@ guidance — and documented it in `.env.example` and `CLAUDE.md` so it isn't rep
 |----|--------|-------|
 | AT-01 Creation | ✅ | `test_scripts.py` |
 | AT-02 Biblical verification | ✅ | `test_scripture.py` |
-| AT-03 Video | ⚠️ partial | Upload/transcribe/subtitle-edit/SRT export all pass (`test_media_upload.py`, `test_transcription.py`). Burn-in rendering (captions inside the safe zone, on the actual video) was never built — see the open question below; this is the one AT-03 assertion still unmet. |
+| AT-03 Video | ✅ | Upload/transcribe/subtitle-edit/SRT export (`test_media_upload.py`, `test_transcription.py`); burn-in render with captions inside the safe zone (`test_burn_in_render.py`) — added after Week 6, see below. |
 | AT-04 Distribution | ✅ | `test_repurpose.py`, `test_publish.py` |
 | AT-05 Analytics | ✅ | `test_metrics_calculations.py` (hand-calculated fixture), `test_metric_validation.py` |
 | AT-06 Insight quality | ✅ | `test_recommendations.py` |
@@ -390,17 +390,12 @@ guidance — and documented it in `.env.example` and `CLAUDE.md` so it isn't rep
 | AT-14 Historical import | ✅ | `test_follower_snapshots_and_historical.py` |
 | AT-15 Export and delete | ✅ | `test_data_export_and_deletion.py` |
 
-13 of 15 fully pass; AT-09 is out of scope by your own earlier decision, and AT-03 is one
-assertion short (burn-in rendering). **No regressions were found** — every test from Weeks 1–5
+13 of 15 fully passed at the end of Week 6 (AT-03 was one assertion short); with burn-in added
+afterwards, 14 of 15 now pass and AT-09 remains out of scope by your own earlier decision. **No regressions were found** — every test from Weeks 1–5
 still passes.
 
-**Decision needed before you start publishing for real:** Instagram, TikTok and X don't accept a
-separate SRT file on upload — they need captions burned into the video itself. Right now the
-export pipeline only produces an SRT sidecar (Week 3's must-ship scope; burn-in was Week 3's own
-designated stretch item, cut every time something ran long). If you plan to publish with
-burned-in captions, that needs building before the pilot's first real post; if you're fine
-captioning manually in each platform's own editor for now, the pilot can start today. Let me know
-which way you want to go.
+**Resolved after Week 6 — see "Post-Week 6: burn-in rendering" below.** (Was: Instagram, TikTok
+and X need captions burned into the video, and only an SRT sidecar existed.)
 
 **Must ship**
 - Rule-based recommendations: topic share-rate differences, hook-type comparisons, high-saves
@@ -431,6 +426,49 @@ which way you want to go.
 - Data export/deletion **UI** (API must already exist as must-ship above) — console/admin-only
   trigger is acceptable for pilot if the UI slips.
 
+## Post-Week 6: burn-in rendering (FR-009, AT-03) — ✅ done (2026-10-15)
+
+Closes the last unmet AT-03 assertion and, as it turned out, a real pipeline blocker: the state
+machine's Ready condition has always required a `render` asset, which nothing created — so no
+project could get past Subtitled.
+
+Delivered: `app/services/captions.py` builds an ASS subtitle file from the reviewed transcript —
+greedy word wrap to `max_chars_per_line` (default 32), `max_lines` per caption (default 2), long
+segments split into several captions with time shared out by text length; bottom-anchored with
+margins that keep the whole caption box (padding included) clear of the bottom 20% and right 12%
+(both configurable); transcript text can't inject ASS override tags. Style (font, size, colours,
+background box, opacity, line limits, safe zone) lives in the brand profile's existing
+`subtitle_style_json` column (no migration needed), validated server-side — including rejecting a
+font too large for a full-length line to fit inside the safe zone — and editable in Settings with
+a 9:16 safe-zone preview. `POST /api/media/{id}/render` requires reviewed subtitles (burned-in
+captions can't be corrected later), and for non-9:16 sources an explicit centre-crop or
+blurred-background-pad choice (`fit_mode_required` otherwise). Output is 1080x1920 H.264/AAC MP4,
+loudness-normalised (single-pass `loudnorm`, I=-14), `+faststart`; the source is never modified
+and earlier renders are kept (they may already be attached to posts). Ready now checks the full
+FRD 1.1 wording: a ready render that passes FR-026 duration/aspect checks for at least one
+configured platform. `ffprobe` parsing moved from CSV to JSON (CSV field order is ffprobe's own,
+not the requested order) and now reads rotation metadata, swapping width/height for 90/270
+(iPhone portrait MOVs). Worker image gains `fonts-dejavu-core` (the default caption font) — with
+`--no-install-recommends`, libass would otherwise have had no font at all.
+
+Verified against real FFmpeg, not just the fake: a throwaway ffmpeg 7.1 binary (libass, x264)
+rendered a synthetic 1920x1080 clip through `build_render_command` in both crop and pad modes —
+output 1080x1920 H.264 9:16, a -30 dB source tone came out at -14.0 LUFS integrated, and the
+extracted frames showed two-line captions sitting exactly on the 80% safe-zone line. The binary
+was not added to the project; `ffprobe` was not available in that build, so the probe path is
+covered by unit tests on real-shaped JSON only.
+
+26 new backend tests (134 total), 1 new frontend test file (5 tests, 15 total); `ruff`, `mypy`,
+`eslint`, `tsc`, `next build` all pass clean.
+
+**Still true:** this dev machine has no FFmpeg, so renders here go through `FakeVideoProcessor`,
+which copies the source unchanged and marks the render `degraded` — Video Studio shows a warning
+that captions were *not* burned in. Real burn-in needs the API running where `ffmpeg`/`ffprobe`
+are on PATH (the worker container, or FFmpeg installed locally with `VIDEO_PROCESSOR=ffmpeg`).
+Renders also run inline in the request like every other media job; a real 3-minute render can
+take a minute or more, so moving render jobs to worker-only processing (return 202, poll
+`/api/jobs/{id}`) is the next step once real FFmpeg is in use.
+
 ---
 
 ## Running risk list
@@ -443,8 +481,9 @@ which way you want to go.
 - `docs/design/` has no handoff yet. UI ships to Tailwind defaults + FRD section 6 screen
   descriptions until a handoff arrives; if one lands mid-build, affected screens get a follow-up
   pass rather than blocking the week they land in.
-- Burn-in rendering (Week 3) and in-app Record mode (Week 4) are the two must-ship-adjacent
-  features already flagged as likely-to-slip stretch in the FRD itself — tracked, not a new risk.
+- In-app Record mode (Week 4) is the remaining must-ship-adjacent feature flagged as
+  likely-to-slip stretch in the FRD itself — tracked, not a new risk. (Burn-in rendering, the
+  other one, shipped after Week 6.)
 
 ## Traceability summary
 All FR-001–FR-030 and AT-01–AT-15 are covered above; see PRD section 10 for the capability-level

@@ -8,6 +8,7 @@ just awaiting the call directly.
 """
 
 import tempfile
+import uuid
 from pathlib import Path
 
 from sqlalchemy import select
@@ -18,6 +19,7 @@ from app.providers.storage import get_storage_provider
 from app.providers.transcription import get_transcription_provider
 from app.providers.video import VideoProcessorUnavailableError, get_video_processor
 from app.providers.vocabulary_seed import SEED_VOCABULARY
+from app.services.captions import SubtitleStyle, build_ass, build_caption_events
 
 
 async def _run_normalize(db: AsyncSession, job: MediaJob, asset: MediaAsset) -> dict:
@@ -69,6 +71,44 @@ async def _run_transcribe(db: AsyncSession, job: MediaJob, asset: MediaAsset) ->
     return {"language": draft.language, "segment_count": len(draft.segments)}
 
 
+async def _run_render(db: AsyncSession, job: MediaJob, asset: MediaAsset) -> dict:
+    """FR-009 burn-in render. `asset` is the render asset (created up front
+    with status `processing`); the source is never modified — the render is
+    written to its own object key."""
+    meta = asset.metadata_json
+    source = await db.get(MediaAsset, uuid.UUID(meta["source_media_asset_id"]))
+    transcript = await db.get(Transcript, uuid.UUID(meta["transcript_id"]))
+    if source is None or transcript is None:
+        raise LookupError("Render source or transcript no longer exists.")
+
+    style = SubtitleStyle.model_validate(meta["style"])
+    storage = get_storage_provider()
+    processor = get_video_processor()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / f"input{Path(source.object_key).suffix}"
+        subtitle_path = Path(tmp) / "captions.ass"
+        output_path = Path(tmp) / "render.mp4"
+        input_path.write_bytes(storage.read(source.object_key))
+        subtitle_path.write_text(build_ass(transcript.segments_json, style), encoding="utf-8")
+
+        info = processor.render_captions(input_path, output_path, subtitle_path, meta.get("fit_mode"))
+        storage.save(asset.object_key, output_path.read_bytes())
+
+    caption_count = len(build_caption_events(transcript.segments_json, style))
+    asset.duration_seconds = info.duration_seconds
+    asset.width = info.width
+    asset.height = info.height
+    asset.metadata_json = {
+        **meta,
+        "codec": info.codec,
+        "degraded": info.is_degraded,
+        "caption_count": caption_count,
+    }
+    asset.status = "ready"
+    return {"caption_count": caption_count, "degraded": info.is_degraded}
+
+
 async def process_job(db: AsyncSession, job: MediaJob) -> None:
     job.status = "running"
     await db.flush()
@@ -84,6 +124,8 @@ async def process_job(db: AsyncSession, job: MediaJob) -> None:
             result = await _run_normalize(db, job, asset)
         elif job.job_type == "transcribe":
             result = await _run_transcribe(db, job, asset)
+        elif job.job_type == "render":
+            result = await _run_render(db, job, asset)
         else:
             raise NotImplementedError(f"Job type '{job.job_type}' is not implemented.")
 

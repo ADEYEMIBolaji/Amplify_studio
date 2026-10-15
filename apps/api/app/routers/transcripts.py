@@ -2,16 +2,27 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.db.models import MediaAsset, Project, Transcript, Workspace
+from app.db.models import MediaAsset, MediaJob, Project, Transcript, Workspace
 from app.deps import DbSession, get_current_workspace
-from app.errors import ConflictError, NotFoundError
-from app.models.schemas import MediaAssetOut, TranscriptOut, TranscriptUpdateRequest
+from app.errors import BadRequestError, ConflictError, NotFoundError
+from app.models.schemas import (
+    MediaAssetOut,
+    MediaJobOut,
+    RenderRequest,
+    TranscriptOut,
+    TranscriptUpdateRequest,
+)
 from app.providers.storage import get_storage_provider
+from app.providers.video import is_vertical_9_16
+from app.routers.brand_profile import _get_or_create as get_or_create_brand_profile
 from app.routers.media import _asset_to_out, _get_owned_asset
+from app.services.captions import style_from_profile
+from app.services.media_jobs import process_job
 from app.services.srt import build_srt
 
 router = APIRouter(tags=["transcripts"])
@@ -122,3 +133,73 @@ async def export_srt(
     out = _asset_to_out(srt_asset)
     out["download_url"] = storage.signed_url(srt_asset.object_key, settings.signed_url_expiry_seconds)
     return out
+
+
+@router.post("/api/media/{asset_id}/render", response_model=MediaJobOut, status_code=202)
+async def render_video(
+    asset_id: uuid.UUID,
+    payload: RenderRequest,
+    workspace: Workspace = Depends(get_current_workspace),
+    db: AsyncSession = DbSession,
+) -> MediaJob:
+    """FR-009 / AT-03: burn the reviewed subtitles into a 1080x1920 H.264
+    MP4, styled from the brand profile and kept inside the safe zone. The
+    source is preserved; each render is a new `render` asset (earlier ones
+    may already be attached to posts, so they're never replaced)."""
+    source = await _get_owned_asset(db, workspace, asset_id)
+    if source.kind != "source":
+        raise BadRequestError("Only an uploaded source video can be rendered.")
+    if source.status != "ready":
+        raise ConflictError("The source video must finish processing before it can be rendered.")
+
+    result = await db.execute(
+        select(Transcript)
+        .where(Transcript.media_asset_id == source.id)
+        .order_by(Transcript.created_at.desc())
+    )
+    transcript = result.scalars().first()
+    if transcript is None:
+        raise ConflictError("Transcribe this video before rendering captions.")
+    if transcript.reviewed_at is None:
+        # Burned-in captions can't be corrected after export, unlike an SRT.
+        raise ConflictError(
+            "Mark the subtitles reviewed before rendering — burned-in captions can't be edited later."
+        )
+
+    if not is_vertical_9_16(source.width, source.height) and payload.fit_mode is None:
+        raise BadRequestError(
+            f"This video is {source.width}x{source.height}, not 9:16 — choose centre-crop or "
+            "blurred-background pad before rendering.",
+            code="fit_mode_required",
+        )
+
+    profile = await get_or_create_brand_profile(db, workspace)
+    try:
+        style = style_from_profile(profile.subtitle_style_json)
+    except ValidationError as exc:
+        raise BadRequestError("Your saved subtitle style is invalid — fix it in Settings.") from exc
+
+    render_id = uuid.uuid4()
+    render = MediaAsset(
+        id=render_id,
+        project_id=source.project_id,
+        object_key=f"render/{workspace.id}/{source.project_id}/{render_id}.mp4",
+        kind="render",
+        status="processing",
+        metadata_json={
+            "source_media_asset_id": str(source.id),
+            "transcript_id": str(transcript.id),
+            "fit_mode": None if is_vertical_9_16(source.width, source.height) else payload.fit_mode,
+            "style": style.model_dump(),
+        },
+    )
+    db.add(render)
+    await db.flush()
+
+    job = MediaJob(workspace_id=workspace.id, media_asset_id=render.id, job_type="render")
+    db.add(job)
+    await db.flush()
+    await process_job(db, job)
+    await db.commit()
+    await db.refresh(job)
+    return job

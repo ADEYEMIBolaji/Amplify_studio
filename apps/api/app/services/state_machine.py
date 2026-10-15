@@ -16,8 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
     PROJECT_STATES,
+    BrandProfile,
     MediaAsset,
     MetricSnapshot,
+    PlatformLimit,
     Project,
     ProjectStateEvent,
     ScriptureReference,
@@ -26,6 +28,11 @@ from app.db.models import (
     Transcript,
 )
 from app.errors import BadRequestError, ConflictError
+from app.services.platform_limits import (
+    check_media_against_limits,
+    ensure_seeded,
+    get_effective_limits,
+)
 
 NEXT_STATE = {state: PROJECT_STATES[i + 1] for i, state in enumerate(PROJECT_STATES[:-1])}
 
@@ -70,15 +77,35 @@ async def _has_reviewed_transcript(db: AsyncSession, project_id) -> bool:
     return result.first() is not None
 
 
-async def _has_ready_render(db: AsyncSession, project_id) -> bool:
+async def _has_ready_render(db: AsyncSession, project: Project) -> bool:
+    """FRD 1.1 Ready: "Export rendered and passes platform constraint checks
+    for at least one target platform (FR-009, FR-026)"."""
     result = await db.execute(
-        select(MediaAsset.id).where(
-            MediaAsset.project_id == project_id,
+        select(MediaAsset).where(
+            MediaAsset.project_id == project.id,
             MediaAsset.kind == "render",
             MediaAsset.status == "ready",
-        ).limit(1)
+        )
     )
-    return result.first() is not None
+    renders = result.scalars().all()
+    if not renders:
+        return False
+
+    profile_result = await db.execute(
+        select(BrandProfile).where(BrandProfile.workspace_id == project.workspace_id)
+    )
+    profile = profile_result.scalar_one_or_none() or BrandProfile(platform_flags_json={})
+    await ensure_seeded(db)
+    platforms = (await db.execute(select(PlatformLimit.platform))).scalars().all()
+    for platform in platforms:
+        limits = await get_effective_limits(db, platform, profile)
+        for render in renders:
+            try:
+                check_media_against_limits(render, limits)
+            except ConflictError:
+                continue
+            return True
+    return False
 
 
 async def _has_scheduled_post(db: AsyncSession, project_id) -> bool:
@@ -117,7 +144,7 @@ CONDITIONS = {
     "script_approved": _script_approved_ok,
     "recorded": lambda db, project: _has_recorded_source(db, project.id),
     "subtitled": lambda db, project: _has_reviewed_transcript(db, project.id),
-    "ready": lambda db, project: _has_ready_render(db, project.id),
+    "ready": _has_ready_render,
     "scheduled": lambda db, project: _has_scheduled_post(db, project.id),
     "published": lambda db, project: _has_published_post(db, project.id),
     "measured": lambda db, project: _has_measured_post(db, project.id),

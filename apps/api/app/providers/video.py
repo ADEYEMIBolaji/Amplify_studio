@@ -9,6 +9,7 @@ not on a bare host), so `FfmpegVideoProcessor` shells out for real while
 the other providers are, not silently swapped.
 """
 
+import json
 import shutil
 import subprocess
 from abc import ABC, abstractmethod
@@ -34,6 +35,17 @@ class VideoInfo:
     is_degraded: bool = False  # True when produced by the fake processor
 
 
+FIT_MODES = ("crop", "pad")
+TARGET_WIDTH = 1080
+TARGET_HEIGHT = 1920
+
+
+def is_vertical_9_16(width: int | None, height: int | None) -> bool:
+    if not width or not height:
+        return False
+    return abs(width / height - 9 / 16) <= 0.01
+
+
 class VideoProcessor(ABC):
     @abstractmethod
     def probe(self, input_path: Path) -> VideoInfo: ...
@@ -44,9 +56,100 @@ class VideoProcessor(ABC):
         ...
 
     @abstractmethod
-    def render_captions(self, input_path: Path, output_path: Path, srt_path: Path, style: dict) -> VideoInfo:
-        """Burn-in render with safe zones and loudness normalisation (FR-009, stretch)."""
+    def render_captions(
+        self, input_path: Path, output_path: Path, subtitle_path: Path, fit_mode: str | None
+    ) -> VideoInfo:
+        """FR-009: 1080x1920 H.264 MP4 with the ASS captions burned in and
+        audio normalised to about -14 LUFS. `fit_mode` ("crop" or "pad") is
+        required when the source isn't already 9:16."""
         ...
+
+
+def parse_probe_json(raw: str) -> VideoInfo:
+    """ffprobe `-of json` output -> VideoInfo. JSON rather than CSV because
+    ffprobe prints CSV fields in its own internal order, not the order they
+    were requested in. Width/height are the *display* dimensions — swapped
+    when rotation metadata says 90/270 (typical of iPhone portrait MOVs)."""
+    data = json.loads(raw)
+    stream = (data.get("streams") or [{}])[0]
+    rotation = 0
+    tag_rotate = (stream.get("tags") or {}).get("rotate")
+    if tag_rotate is not None:
+        rotation = int(float(tag_rotate))
+    for side_data in stream.get("side_data_list") or []:
+        if "rotation" in side_data:
+            rotation = int(float(side_data["rotation"]))
+    rotation %= 360
+
+    width, height = int(stream["width"]), int(stream["height"])
+    if rotation in (90, 270):
+        width, height = height, width
+
+    duration = stream.get("duration") or (data.get("format") or {}).get("duration") or 0
+    return VideoInfo(
+        duration_seconds=float(duration),
+        width=width,
+        height=height,
+        codec=str(stream.get("codec_name", "unknown")),
+        rotation_degrees=rotation,
+    )
+
+
+def _escape_filter_path(path: Path) -> str:
+    # Inside a quoted FFmpeg filter argument, `:` must still be escaped
+    # (Windows drive letters), as must `\` and `'`.
+    text = path.as_posix()
+    for char in ("\\", ":", "'"):
+        text = text.replace(char, "\\" + char)
+    return text
+
+
+def build_render_filtergraph(
+    source_width: int, source_height: int, fit_mode: str | None, subtitle_path: Path
+) -> str:
+    """FR-009 video filtergraph -> `[v]`. 9:16 sources are scaled straight to
+    1080x1920; others are centre-cropped, or padded onto a blurred, filled
+    copy of themselves ("blurred-background pad"), per the Owner's choice."""
+    w, h = TARGET_WIDTH, TARGET_HEIGHT
+    subs = f"ass='{_escape_filter_path(subtitle_path)}'"
+    if is_vertical_9_16(source_width, source_height):
+        return f"[0:v]scale={w}:{h},setsar=1,{subs}[v]"
+    if fit_mode == "crop":
+        return (
+            f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
+            f"crop={w}:{h},setsar=1,{subs}[v]"
+        )
+    if fit_mode == "pad":
+        return (
+            "[0:v]split=2[bg][fg];"
+            f"[bg]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},boxblur=20:5[bgb];"
+            f"[fg]scale={w}:{h}:force_original_aspect_ratio=decrease[fgs];"
+            f"[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1,{subs}[v]"
+        )
+    raise ValueError("A non-9:16 source needs fit_mode 'crop' or 'pad'.")
+
+
+def build_render_command(
+    input_path: Path,
+    output_path: Path,
+    subtitle_path: Path,
+    source_width: int,
+    source_height: int,
+    fit_mode: str | None,
+) -> list[str]:
+    return [
+        "ffmpeg", "-y", "-i", str(input_path),
+        "-filter_complex", build_render_filtergraph(source_width, source_height, fit_mode, subtitle_path),
+        "-map", "[v]", "-map", "0:a?",
+        # Single-pass loudnorm lands within about 1 LU of target — FR-009 asks
+        # for "approximately -14 LUFS". loudnorm upsamples internally, so
+        # resample back to a delivery rate.
+        "-af", "loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-r", "30",
+        "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart",
+        str(output_path),
+    ]
 
 
 class FfmpegVideoProcessor(VideoProcessor):
@@ -60,19 +163,14 @@ class FfmpegVideoProcessor(VideoProcessor):
         result = subprocess.run(
             [
                 "ffprobe", "-v", "error", "-select_streams", "v:0",
-                "-show_entries", "stream=width,height,codec_name,duration",
-                "-of", "csv=p=0", str(input_path),
+                "-show_entries",
+                "stream=width,height,codec_name,duration:stream_tags=rotate:"
+                "stream_side_data=rotation:format=duration",
+                "-of", "json", str(input_path),
             ],
             capture_output=True, text=True, check=True,
         )
-        width_str, height_str, codec, duration_str = result.stdout.strip().split(",")
-        return VideoInfo(
-            duration_seconds=float(duration_str),
-            width=int(width_str),
-            height=int(height_str),
-            codec=codec,
-            rotation_degrees=0,
-        )
+        return parse_probe_json(result.stdout)
 
     def normalize(self, input_path: Path, output_path: Path) -> VideoInfo:
         subprocess.run(
@@ -85,16 +183,14 @@ class FfmpegVideoProcessor(VideoProcessor):
         )
         return self.probe(output_path)
 
-    def render_captions(self, input_path: Path, output_path: Path, srt_path: Path, style: dict) -> VideoInfo:
-        font_size = style.get("font_size", 24)
+    def render_captions(
+        self, input_path: Path, output_path: Path, subtitle_path: Path, fit_mode: str | None
+    ) -> VideoInfo:
+        source = self.probe(input_path)
         subprocess.run(
-            [
-                "ffmpeg", "-y", "-i", str(input_path),
-                "-vf", f"subtitles={srt_path}:force_style='Fontsize={font_size}'",
-                "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
-                "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                str(output_path),
-            ],
+            build_render_command(
+                input_path, output_path, subtitle_path, source.width, source.height, fit_mode
+            ),
             capture_output=True, check=True,
         )
         return self.probe(output_path)
@@ -121,7 +217,12 @@ class FakeVideoProcessor(VideoProcessor):
         output_path.write_bytes(input_path.read_bytes())
         return self.probe(output_path)
 
-    def render_captions(self, input_path: Path, output_path: Path, srt_path: Path, style: dict) -> VideoInfo:
+    def render_captions(
+        self, input_path: Path, output_path: Path, subtitle_path: Path, fit_mode: str | None
+    ) -> VideoInfo:
+        # Captions are NOT burned in here — the copy is marked degraded and
+        # the UI says so. The ASS file is still built upstream, so caption
+        # layout is exercised even without FFmpeg.
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(input_path.read_bytes())
         return self.probe(output_path)

@@ -69,7 +69,7 @@ with the **service role**, which bypasses Postgres RLS (FRD section 1, NFR Secur
 │       │   ├── models/schemas.py   # Pydantic request/response models
 │       │   ├── db/                 # SQLAlchemy models (models.py) mirroring the Supabase migration, base.py, portable GUID type
 │       │   ├── providers/          # LLMProvider, TranscriptionProvider, VideoProcessor, StorageProvider + Fake/Local implementations
-│       │   ├── services/           # state_machine.py (FRD 1.1), audit.py, scripts.py, scripture.py, media_jobs.py, srt.py, posts.py (timezone/external-ID parsing), platform_limits.py, reminders.py, metrics.py (FR-015 calculations), metric_snapshots.py (FR-013/014 ingestion), insights.py (FR-017 recommendations), weekly_review.py (FR-019), data_export.py (FR-030)
+│       │   ├── services/           # state_machine.py (FRD 1.1), audit.py, scripts.py, scripture.py, media_jobs.py, srt.py, captions.py (FR-009 burn-in layout/ASS), posts.py (timezone/external-ID parsing), platform_limits.py, reminders.py, metrics.py (FR-015 calculations), metric_snapshots.py (FR-013/014 ingestion), insights.py (FR-017 recommendations), weekly_review.py (FR-019), data_export.py (FR-030)
 │       │   ├── worker/             # polls media_jobs left pending + due reminders (main.py)
 │       │   ├── auth.py             # Supabase JWT verification
 │       │   ├── deps.py             # DB session + get_current_workspace (provisions user/workspace on first call)
@@ -194,7 +194,8 @@ tooling is Supabase CLI SQL files (`supabase/migrations/`), consumed by the back
 SQLAlchemy Core, no ORM-driven schema generation; D-03/D-04/D-05/D-06 provider choices still open
 (fakes/console logging stand in); the local WEB verse corpus (`app/providers/data/web_sample.json`)
 covers only ~10 commonly-cited verses, not the full Bible — see plan.md Week 2 notes; no FFmpeg
-binary on this dev machine, so media processing runs through `FakeVideoProcessor`
+binary on this dev machine, so media processing (including FR-009 burn-in renders, which come out
+marked `degraded` with captions *not* burned in) runs through `FakeVideoProcessor`
 (`app/providers/video.py`) — real normalisation/burn-in only runs where `ffmpeg`/`ffprobe` are on
 PATH (the worker container) — see plan.md Week 3 notes; private media storage is a
 filesystem-backed `LocalStorageProvider` (`app/providers/storage.py`) with HMAC-signed, time-limited

@@ -1,9 +1,11 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from app.db.models import PROJECT_STATES
+from app.services.captions import SubtitleStyle, style_from_profile
 
 # ---------------------------------------------------------------------------
 # Projects — FR-002
@@ -337,6 +339,7 @@ class BrandProfileUpdate(BaseModel):
     wpm: int | None = Field(default=None, ge=80, le=220)
     timezone: str | None = None
     platform_flags_json: dict[str, bool] | None = None
+    subtitle_style_json: SubtitleStyle | None = None  # FR-009
 
 
 class SectionOut(BaseModel):
@@ -463,8 +466,15 @@ class MediaAssetOut(BaseModel):
     height: int | None
     metadata_json: dict
     download_url: str | None = None
+    created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
+
+
+class RenderRequest(BaseModel):
+    """FR-009: required only when the source isn't already 9:16."""
+
+    fit_mode: Literal["crop", "pad"] | None = None
 
 
 class MediaJobOut(BaseModel):
@@ -525,6 +535,17 @@ class BrandProfileOut(BaseModel):
     wpm: int
     timezone: str
     platform_flags_json: dict
+    subtitle_style_json: dict
     version_no: int
 
     model_config = {"from_attributes": True}
+
+    @field_validator("subtitle_style_json", mode="before")
+    @classmethod
+    def _effective_style(cls, value: dict | None) -> dict:
+        # Show the style renders will actually use: FRD defaults fill any
+        # field never saved (profiles created before FR-009 store `{}`).
+        try:
+            return style_from_profile(value).model_dump()
+        except ValidationError:
+            return SubtitleStyle().model_dump()

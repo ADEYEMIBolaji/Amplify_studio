@@ -145,7 +145,26 @@ export interface MediaAsset {
   height: number | null;
   metadata_json: Record<string, unknown>;
   download_url: string | null;
+  created_at: string | null;
 }
+
+/** FR-009 — burn-in caption style, stored on the brand profile. */
+export interface SubtitleStyle {
+  font_family: string;
+  font_size: number;
+  bold: boolean;
+  text_colour: string;
+  background_box: boolean;
+  background_colour: string;
+  background_opacity: number;
+  max_chars_per_line: number;
+  max_lines: number;
+  safe_zone_bottom_pct: number;
+  safe_zone_right_pct: number;
+  safe_zone_left_pct: number;
+}
+
+export type RenderFitMode = "crop" | "pad";
 
 export interface MediaJob {
   id: string;
@@ -383,5 +402,6 @@ export interface BrandProfile {
   wpm: number;
   timezone: string;
   platform_flags_json: Record<string, boolean>;
+  subtitle_style_json: SubtitleStyle;
   version_no: number;
 }
