@@ -11,10 +11,13 @@ connect_args: dict[str, Any]
 if settings.database_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 else:
-    # Supabase's pooler runs PgBouncer in transaction mode, which doesn't
-    # support asyncpg's server-side prepared statements — disabling the
-    # statement cache is required for the pooled connection string to work
-    # at all, and is a harmless no-op against a direct (non-pooled) one.
+    # Belt-and-suspenders: disables asyncpg's client-side prepared-statement
+    # cache. Harmless against Supabase's Session pooler (what DATABASE_URL
+    # should point at — see .env.example) or a direct connection; required
+    # if anything ever points this at the Transaction pooler instead, whose
+    # PgBouncer mode doesn't support prepared statements at all and raises
+    # DuplicatePreparedStatementError under concurrent load even with this
+    # set — found that the hard way, don't repoint at port 6543.
     connect_args = {"statement_cache_size": 0}
 
 engine = create_async_engine(settings.database_url, echo=False, connect_args=connect_args)

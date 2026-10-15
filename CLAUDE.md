@@ -49,7 +49,9 @@ with the **service role**, which bypasses Postgres RLS (FRD section 1, NFR Secur
 │   │   │       ├── dashboard/       # home — pipeline-by-state placeholder until FR-025 (Week 5)
 │   │   │       ├── settings/        # FR-020 voice profile and guardrails, FR-026 X Premium flag
 │   │   │       ├── calendar/        # FR-011/012 schedule, publish, unpublish
-│   │   │       ├── growth-lab/      # FR-013/014/015/016/028/029 metrics, follower snapshots, historical import, period comparison
+│   │   │       ├── growth-lab/      # FR-013/014/015/016/017/028/029 metrics, follower snapshots, historical import, period comparison, recommendations
+│   │   │       ├── experiments/     # FR-018 hypothesis, comparison posts, confounders, outcome
+│   │   │       ├── weekly-review/   # FR-019 on-demand report, mark complete
 │   │   │       └── projects/        # FR-002 list/create; [id] for edit/archive/transition, script, hooks, references
 │   │   │           └── [id]/
 │   │   │               ├── video/          # FR-007/008/009 upload, transcription, subtitle edit, SRT export
@@ -63,11 +65,11 @@ with the **service role**, which bypasses Postgres RLS (FRD section 1, NFR Secur
 │   │   └── tests/                   # Vitest (tests/unit) + Playwright (tests/e2e)
 │   └── api/                        # FastAPI app (Python 3.12)
 │       ├── app/
-│       │   ├── routers/            # projects, topic_tags, brand_profile, scripts, hooks, references, media, transcripts, vocabulary, posts, platform_limits, metrics, dashboard
+│       │   ├── routers/            # projects, topic_tags, brand_profile, scripts, hooks, references, media, transcripts, vocabulary, posts, platform_limits, metrics, dashboard, experiments, weekly_review, data (export/delete)
 │       │   ├── models/schemas.py   # Pydantic request/response models
 │       │   ├── db/                 # SQLAlchemy models (models.py) mirroring the Supabase migration, base.py, portable GUID type
 │       │   ├── providers/          # LLMProvider, TranscriptionProvider, VideoProcessor, StorageProvider + Fake/Local implementations
-│       │   ├── services/           # state_machine.py (FRD 1.1), audit.py, scripts.py, scripture.py, media_jobs.py, srt.py, posts.py (timezone/external-ID parsing), platform_limits.py, reminders.py, metrics.py (FR-015 calculations), metric_snapshots.py (FR-013/014 ingestion); recommendations/experiments land Week 6
+│       │   ├── services/           # state_machine.py (FRD 1.1), audit.py, scripts.py, scripture.py, media_jobs.py, srt.py, posts.py (timezone/external-ID parsing), platform_limits.py, reminders.py, metrics.py (FR-015 calculations), metric_snapshots.py (FR-013/014 ingestion), insights.py (FR-017 recommendations), weekly_review.py (FR-019), data_export.py (FR-030)
 │       │   ├── worker/             # polls media_jobs left pending + due reminders (main.py)
 │       │   ├── auth.py             # Supabase JWT verification
 │       │   ├── deps.py             # DB session + get_current_workspace (provisions user/workspace on first call)
@@ -164,9 +166,9 @@ sync when a field changes.
   Week 5 stretch, after manual metric entry works.
 
 ## Status
-Weeks 1–5 built, and the app is now connected to a real Supabase project (see "Live environment"
-below) — see [docs/plan.md](docs/plan.md) for what shipped, what's stubbed, and what's next.
-Week 6 not yet started.
+Weeks 1–6 built — all six FRD sprint weeks are now complete, and the app is connected to a real
+Supabase project (see "Live environment" below). See [docs/plan.md](docs/plan.md) for what
+shipped, what's stubbed, and the pilot-readiness summary.
 
 **Migrations against the live project are not automatic.** There's no Supabase CLI link, so a new
 file in `supabase/migrations/` does nothing by itself — run `python scripts/apply_migrations.py`
@@ -180,7 +182,12 @@ migration file, not just when a test fails.
 saved to `.credentials.local` at the repo root (gitignored) — move that to a password manager when
 convenient. `apps/api/app/auth.py` verifies both HS256 (legacy shared-secret) and ES256
 (newer per-project asymmetric key, verified via JWKS) Supabase projects — found this the hard way
-when the first real login attempt failed against this project's ES256 tokens.
+when the first real login attempt failed against this project's ES256 tokens. `DATABASE_URL` must
+use Supabase's **Session pooler** (port 5432), not the Transaction pooler (6543) — the latter's
+PgBouncer mode broke asyncpg's prepared statements outright
+(`DuplicatePreparedStatementError`) under real concurrent load, even with `statement_cache_size=0`
+set; this backend holds long-lived connections, which is exactly the case Supabase's own docs say
+needs the Session pooler.
 
 Open: no `docs/design/` handoff yet (UI follows Tailwind defaults + FRD section 6); migration
 tooling is Supabase CLI SQL files (`supabase/migrations/`), consumed by the backend via

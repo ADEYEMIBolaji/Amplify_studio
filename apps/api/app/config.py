@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     frontend_base_url: str = "http://localhost:3000"
     reminder_lead_minutes: int = 30
 
+    insight_min_group_size: int = 5
+    insight_min_relative_difference: float = 0.20
+
     @property
     def is_development(self) -> bool:
         return self.env == "development"

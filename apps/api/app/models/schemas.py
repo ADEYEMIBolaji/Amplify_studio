@@ -243,6 +243,87 @@ class AnalyticsOverviewOut(BaseModel):
     previous: PlatformPeriodMetricsOut
 
 
+class GroupComparisonOut(BaseModel):
+    dimension: str
+    metric: str
+    group_a: str
+    group_b: str
+    value_a: float
+    value_b: float
+    better_group: str
+    relative_difference: float
+    post_ids_a: list[str]
+    post_ids_b: list[str]
+    summary: str
+
+
+class InsufficientDataOut(BaseModel):
+    dimension: str
+    metric: str
+    group_counts: dict[str, int]
+    min_required: int
+    posts_still_needed: int
+
+
+class HighlightPostOut(BaseModel):
+    post_id: str
+    caption: str | None
+    metric: str
+    value: float
+    baseline_median: float
+    summary: str
+
+
+class RecommendationsOut(BaseModel):
+    platform: str
+    comparisons: list[GroupComparisonOut]
+    insufficient_data: list[InsufficientDataOut]
+    high_savers: list[HighlightPostOut]
+    underperformers: list[HighlightPostOut]
+    consistency_warning: str | None
+
+
+class ExperimentCreate(BaseModel):
+    hypothesis: str = Field(min_length=1)
+    variable: str = Field(description="hook | topic | length | cta | posting_slot")
+    metric: str
+    post_ids: list[uuid.UUID] = Field(min_length=2)
+    variants: dict[str, str] = {}  # post_id (str) -> variant label, optional
+
+
+class ExperimentUpdate(BaseModel):
+    outcome: str | None = Field(default=None, description="supported | not_supported | inconclusive")
+    outcome_note: str | None = None
+    status: str | None = None
+
+
+class ExperimentOut(BaseModel):
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    hypothesis: str
+    variable: str
+    metric: str
+    status: str
+    outcome: str | None
+    outcome_note: str | None
+    post_ids: list[str]
+    confounders: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class WeeklyReviewOut(BaseModel):
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    week_start: str
+    report_json: dict
+    reviewed_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
 class BrandProfileUpdate(BaseModel):
     tone: str | None = None
     voice_samples_json: list[str] | None = None

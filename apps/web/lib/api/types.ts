@@ -289,6 +289,85 @@ export interface HomeDashboard {
   active_experiments: unknown[];
 }
 
+export interface GroupComparison {
+  dimension: string;
+  metric: string;
+  group_a: string;
+  group_b: string;
+  value_a: number;
+  value_b: number;
+  better_group: string;
+  relative_difference: number;
+  post_ids_a: string[];
+  post_ids_b: string[];
+  summary: string;
+}
+
+export interface InsufficientData {
+  dimension: string;
+  metric: string;
+  group_counts: Record<string, number>;
+  min_required: number;
+  posts_still_needed: number;
+}
+
+export interface HighlightPost {
+  post_id: string;
+  caption: string | null;
+  metric: string;
+  value: number;
+  baseline_median: number;
+  summary: string;
+}
+
+export interface Recommendations {
+  platform: Platform;
+  comparisons: GroupComparison[];
+  insufficient_data: InsufficientData[];
+  high_savers: HighlightPost[];
+  underperformers: HighlightPost[];
+  consistency_warning: string | null;
+}
+
+export interface Experiment {
+  id: string;
+  workspace_id: string;
+  hypothesis: string;
+  variable: string;
+  metric: string;
+  status: "open" | "closed";
+  outcome: "supported" | "not_supported" | "inconclusive" | null;
+  outcome_note: string | null;
+  post_ids: string[];
+  confounders: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WeeklyReview {
+  id: string;
+  workspace_id: string;
+  week_start: string;
+  report_json: {
+    week_start: string;
+    best_posts: { post_id: string; platform: string; caption: string | null; reach: number }[];
+    worst_posts: { post_id: string; platform: string; caption: string | null; reach: number }[];
+    platform_changes: Record<
+      string,
+      {
+        reach_median_current: number | null;
+        reach_median_previous: number | null;
+        posting_adherence_current: number | null;
+        data_coverage: { eligible: number; total: number };
+      }
+    >;
+    data_gaps: string[];
+    suggested_experiments: { platform: string; variable: string; hypothesis: string; evidence: string }[];
+    disclaimer: string;
+  };
+  reviewed_at: string | null;
+}
+
 export interface BrandProfile {
   id: string;
   workspace_id: string;

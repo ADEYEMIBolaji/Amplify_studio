@@ -4,8 +4,16 @@ import SettingsPage from "@/app/(dashboard)/settings/page";
 import { api } from "@/lib/api/client";
 
 vi.mock("@/lib/api/client", () => ({
-  api: { get: vi.fn(), patch: vi.fn() },
+  api: { get: vi.fn(), patch: vi.fn(), post: vi.fn(), del: vi.fn() },
   ApiError: class ApiError extends Error {},
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => ({ auth: { signOut: vi.fn() } }),
 }));
 
 const baseProfile = {

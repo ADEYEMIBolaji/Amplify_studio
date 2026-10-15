@@ -7,6 +7,7 @@ import {
   FollowerSnapshot,
   Platform,
   PlatformPeriodMetrics,
+  Recommendations,
   SocialPost,
 } from "@/lib/api/types";
 
@@ -19,6 +20,7 @@ export default function GrowthLabPage() {
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [rangeDays, setRangeDays] = useState(28);
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendations | null>(null);
   const [posts, setPosts] = useState<SocialPost[] | null>(null);
   const [followerSnapshots, setFollowerSnapshots] = useState<FollowerSnapshot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +33,14 @@ export default function GrowthLabPage() {
       setError(err instanceof ApiError ? err.message : "Couldn't load analytics.");
     }
   }, [platform, rangeDays]);
+
+  const loadRecommendations = useCallback(async () => {
+    try {
+      setRecommendations(await api.get(`/api/analytics/recommendations?platform=${platform}`));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't load recommendations.");
+    }
+  }, [platform]);
 
   const loadPosts = useCallback(async () => {
     try {
@@ -52,6 +62,10 @@ export default function GrowthLabPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadOverview();
   }, [loadOverview]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadRecommendations();
+  }, [loadRecommendations]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPosts();
@@ -131,6 +145,56 @@ export default function GrowthLabPage() {
               {overview.current.net_follower_change_low_confidence &&
                 " Follower change is low-confidence (snapshot more than 2 days from the period boundary)."}
             </p>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-medium">Recommendations</h2>
+        {recommendations === null ? (
+          <p className="text-sm text-black/60 dark:text-white/60">Loading…</p>
+        ) : (
+          <div className="space-y-3">
+            {recommendations.consistency_warning && (
+              <p className="rounded border border-yellow-600/30 bg-yellow-50 p-2 text-sm text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300">
+                {recommendations.consistency_warning}
+              </p>
+            )}
+
+            {recommendations.comparisons.length === 0 &&
+              recommendations.insufficient_data.length === 0 &&
+              recommendations.high_savers.length === 0 &&
+              recommendations.underperformers.length === 0 &&
+              !recommendations.consistency_warning && (
+                <p className="text-sm text-black/60 dark:text-white/60">
+                  Nothing to report yet for {platform}.
+                </p>
+              )}
+
+            {recommendations.comparisons.map((c, i) => (
+              <div key={i} className="rounded border border-green-600/30 bg-green-50 p-3 text-sm dark:bg-green-900/20">
+                <p>{c.summary}</p>
+              </div>
+            ))}
+
+            {recommendations.insufficient_data.map((d, i) => (
+              <p key={i} className="text-sm text-black/60 dark:text-white/60">
+                Not enough data yet to compare {d.dimension} groups — need {d.posts_still_needed} more post(s)
+                in a group (have: {Object.entries(d.group_counts).map(([k, v]) => `${k}=${v}`).join(", ")}).
+              </p>
+            ))}
+
+            {recommendations.high_savers.map((h) => (
+              <p key={h.post_id} className="text-sm text-black/80 dark:text-white/80">
+                {h.summary}
+              </p>
+            ))}
+
+            {recommendations.underperformers.map((h) => (
+              <p key={h.post_id} className="text-sm text-black/80 dark:text-white/80">
+                {h.summary}
+              </p>
+            ))}
           </div>
         )}
       </section>

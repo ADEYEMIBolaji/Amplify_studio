@@ -333,7 +333,74 @@ an empty list for now, not a bug.
 
 ---
 
-## Week 6 — Recommendations, weekly review, experiments, QA, pilot start
+## Week 6 — Recommendations, weekly review, experiments, QA, pilot start — ✅ done (2026-10-15)
+
+Delivered: rule-based recommendations (`app/services/insights.py`) comparing posts grouped by
+hook type, topic, format, length bucket and posting slot, each requiring ≥5 posts per group and
+≥20% relative difference (both configurable) before saying anything, with an explicit
+insufficient-data message naming the count still needed when a dimension has data but not enough
+of it — and genuine silence (no entry at all) for dimensions with zero tagged posts, so the list
+never implies more analysis happened than it did; "high savers" and "underperforming retention"
+highlight individual posts against the platform median; a posting-adherence consistency check
+against the PRD's own 80% target. Every piece of generated wording is observational
+("had a higher X in this period"), never causal or growth-promising — enforced by a disclaimer
+appended to every claim and tested directly (AT-06). Experiments with confounder detection (every
+FR-021 tag dimension other than the primary variable, flagged when it differs between compared
+posts) and Owner-recorded outcomes. An on-demand weekly review (best/worst posts by latest reach,
+platform period-over-period changes, missing-follower-snapshot gaps, up to 3 suggested
+experiments pulled from the same insights engine) that preserves `reviewed_at` across
+regeneration (AT-13). Data export (full JSON, media as signed links) and deletion — project,
+media asset, and whole-workspace, with storage objects removed explicitly before the DB cascade
+(AT-15). Growth Lab recommendations UI, an Experiments page, and a Weekly Review page. Extended
+AT-07 workspace-isolation coverage to every resource type added since Week 1 (posts, metrics,
+media, experiments, weekly reviews, export). 23 new backend tests (108 total), 0 new frontend
+test files needed (existing Growth Lab/Settings tests extended in place); `ruff`, `mypy`,
+`eslint`, `tsc`, `next build` all pass clean.
+
+**Two real bugs this week's own tests and live-environment verification caught:** (1) the initial
+`_compare_dimension` logic only reported "insufficient data" when ≥2 distinct tag values already
+existed — meaning the realistic early-pilot case (everything tagged the same hook type so far)
+silently produced nothing instead of the count-still-needed message AT-06 expects; fixed to report
+insufficient data whenever a dimension has any tagged posts but can't yet form two qualifying
+groups. (2) exercising `/api/export` against the live Supabase project surfaced
+`DuplicatePreparedStatementError` — the Transaction-mode pooler (port 6543) this project's
+`DATABASE_URL` was using doesn't support asyncpg's prepared statements under concurrent load even
+with `statement_cache_size=0` set, which is a real limitation of PgBouncer transaction mode, not
+something fixable from our side. Switched to Supabase's Session pooler (port 5432) — the
+correct choice for a long-lived backend connection pool like this one, per Supabase's own
+guidance — and documented it in `.env.example` and `CLAUDE.md` so it isn't repeated.
+
+### Pilot-readiness summary: AT-01 through AT-15
+
+| AT | Status | Notes |
+|----|--------|-------|
+| AT-01 Creation | ✅ | `test_scripts.py` |
+| AT-02 Biblical verification | ✅ | `test_scripture.py` |
+| AT-03 Video | ⚠️ partial | Upload/transcribe/subtitle-edit/SRT export all pass (`test_media_upload.py`, `test_transcription.py`). Burn-in rendering (captions inside the safe zone, on the actual video) was never built — see the open question below; this is the one AT-03 assertion still unmet. |
+| AT-04 Distribution | ✅ | `test_repurpose.py`, `test_publish.py` |
+| AT-05 Analytics | ✅ | `test_metrics_calculations.py` (hand-calculated fixture), `test_metric_validation.py` |
+| AT-06 Insight quality | ✅ | `test_recommendations.py` |
+| AT-07 Security | ✅ | `test_workspace_isolation.py` + `test_workspace_isolation_extended.py`, covering every resource type through Week 6 |
+| AT-08 Teleprompter | ⚠️ untested | Pure browser/DOM behaviour (countdown, wake lock, mirror) — never had an automated test; verified manually in Week 2. No regression risk since nothing has touched that code since. |
+| AT-09 Recording | N/A | In-app Record mode (FR-024) was never built — D-01's default made Prompter-only must-ship and Record mode stretch, and stretch was never requested. Not a gap against what was agreed. |
+| AT-10 Platform limits | ✅ | `test_platform_limits.py` |
+| AT-11 Timezone | ✅ | `test_calendar_timezone.py`, verified against a real BST/GMT boundary date |
+| AT-12 Reminders | ✅ | `test_reminders.py` |
+| AT-13 Weekly review | ✅ | `test_weekly_review.py` |
+| AT-14 Historical import | ✅ | `test_follower_snapshots_and_historical.py` |
+| AT-15 Export and delete | ✅ | `test_data_export_and_deletion.py` |
+
+13 of 15 fully pass; AT-09 is out of scope by your own earlier decision, and AT-03 is one
+assertion short (burn-in rendering). **No regressions were found** — every test from Weeks 1–5
+still passes.
+
+**Decision needed before you start publishing for real:** Instagram, TikTok and X don't accept a
+separate SRT file on upload — they need captions burned into the video itself. Right now the
+export pipeline only produces an SRT sidecar (Week 3's must-ship scope; burn-in was Week 3's own
+designated stretch item, cut every time something ran long). If you plan to publish with
+burned-in captions, that needs building before the pilot's first real post; if you're fine
+captioning manually in each platform's own editor for now, the pilot can start today. Let me know
+which way you want to go.
 
 **Must ship**
 - Rule-based recommendations: topic share-rate differences, hook-type comparisons, high-saves

@@ -15,10 +15,12 @@ from app.models.schemas import (
     HistoricalPostCreate,
     MetricSnapshotCreate,
     MetricSnapshotOut,
+    RecommendationsOut,
     SocialPostOut,
 )
 from app.services import metric_snapshots as snapshot_service
 from app.services import posts as posts_service
+from app.services.insights import build_insights
 from app.services.metrics import PlatformPeriodMetrics, compute_platform_period_metrics
 
 router = APIRouter(tags=["metrics"])
@@ -192,4 +194,25 @@ async def analytics_overview(
     return {
         "current": _metrics_to_out(current, range_days),
         "previous": _metrics_to_out(previous, range_days),
+    }
+
+
+@router.get("/api/analytics/recommendations", response_model=RecommendationsOut)
+async def analytics_recommendations(
+    platform: str = Query(...),
+    target_day: int = Query(default=7),
+    workspace: Workspace = Depends(get_current_workspace),
+    db: AsyncSession = DbSession,
+) -> dict:
+    """FR-017: rule-based recommendations, each requiring >=5 posts per
+    group (configurable) and >=20% relative difference (configurable),
+    always citing evidence. AT-06."""
+    result = await build_insights(db, workspace_id=workspace.id, platform=platform, target_day=target_day)
+    return {
+        "platform": result.platform,
+        "comparisons": [vars(c) for c in result.comparisons],
+        "insufficient_data": [vars(i) for i in result.insufficient_data],
+        "high_savers": [vars(h) for h in result.high_savers],
+        "underperformers": [vars(h) for h in result.underperformers],
+        "consistency_warning": result.consistency_warning,
     }

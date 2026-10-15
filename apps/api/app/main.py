@@ -6,6 +6,8 @@ from app.errors import register_exception_handlers
 from app.routers import (
     brand_profile,
     dashboard,
+    data,
+    experiments,
     hooks,
     media,
     metrics,
@@ -17,6 +19,7 @@ from app.routers import (
     topic_tags,
     transcripts,
     vocabulary,
+    weekly_review,
 )
 
 settings = get_settings()
@@ -46,6 +49,9 @@ app.include_router(posts.router)
 app.include_router(platform_limits.router)
 app.include_router(metrics.router)
 app.include_router(dashboard.router)
+app.include_router(experiments.router)
+app.include_router(weekly_review.router)
+app.include_router(data.router)
 
 
 @app.get("/health")

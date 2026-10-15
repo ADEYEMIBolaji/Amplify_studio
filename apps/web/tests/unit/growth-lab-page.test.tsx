@@ -14,6 +14,15 @@ vi.mock("@/lib/api/client", () => ({
   },
 }));
 
+const emptyRecommendations = {
+  platform: "instagram",
+  comparisons: [],
+  insufficient_data: [],
+  high_savers: [],
+  underperformers: [],
+  consistency_warning: null,
+};
+
 const baseMetrics = {
   platform: "instagram",
   start: "2026-06-01T00:00:00Z",
@@ -41,6 +50,9 @@ describe("GrowthLabPage", () => {
       if (path.startsWith("/api/analytics/overview")) {
         return Promise.resolve({ current: baseMetrics, previous: baseMetrics });
       }
+      if (path.startsWith("/api/analytics/recommendations")) {
+        return Promise.resolve(emptyRecommendations);
+      }
       return Promise.resolve([]);
     });
 
@@ -57,6 +69,9 @@ describe("GrowthLabPage", () => {
           current: { ...baseMetrics, low_sample: true },
           previous: baseMetrics,
         });
+      }
+      if (path.startsWith("/api/analytics/recommendations")) {
+        return Promise.resolve(emptyRecommendations);
       }
       return Promise.resolve([]);
     });

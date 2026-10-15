@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api/client";
+import { createClient } from "@/lib/supabase/client";
 import { BrandProfile } from "@/lib/api/types";
 
 /** FR-020 — creator voice profile and guardrails, injected into every
@@ -82,6 +84,7 @@ export default function SettingsPage() {
   }
 
   return (
+    <>
     <form onSubmit={handleSave} className="max-w-xl space-y-6">
       <h1 className="text-xl font-semibold">Voice profile and guardrails</h1>
       <p className="text-sm text-black/60 dark:text-white/60">
@@ -185,6 +188,88 @@ export default function SettingsPage() {
         {saving ? "Saving…" : "Save"}
       </button>
     </form>
+    <DataManagement />
+    </>
+  );
+}
+
+function DataManagement() {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleExport() {
+    setBusy("export");
+    setError(null);
+    try {
+      const data = await api.post("/api/export");
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "amplify-studio-export.json";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't export your data.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleDeleteWorkspace() {
+    if (
+      !window.confirm(
+        "This permanently deletes your entire workspace — every project, script, video, post and metric. This cannot be undone. Continue?",
+      )
+    ) {
+      return;
+    }
+    setBusy("delete");
+    setError(null);
+    try {
+      await api.del("/api/workspace");
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      router.push("/login");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't delete your workspace.");
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="mt-10 max-w-xl space-y-3 border-t border-black/10 pt-6 dark:border-white/10">
+      <h2 className="text-lg font-semibold">Data export and deletion</h2>
+      <p className="text-sm text-black/60 dark:text-white/60">FR-030.</p>
+
+      {error && (
+        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={handleExport}
+          className="rounded border border-black/20 px-3 py-2 text-sm font-medium disabled:opacity-50 dark:border-white/20"
+        >
+          {busy === "export" ? "Exporting…" : "Export all my data"}
+        </button>
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={handleDeleteWorkspace}
+          className="rounded border border-red-600 px-3 py-2 text-sm font-medium text-red-600 disabled:opacity-50 dark:border-red-400 dark:text-red-400"
+        >
+          {busy === "delete" ? "Deleting…" : "Delete my entire workspace"}
+        </button>
+      </div>
+    </section>
   );
 }
 
